@@ -1032,3 +1032,4 @@ export default function AdminWholesaleLeadsPage() {
     </div>
   )
 }
+

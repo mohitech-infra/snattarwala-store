@@ -60,30 +60,45 @@ export default function Home() {
               ? 'sm:grid-cols-2 lg:grid-cols-4' 
               : 'sm:grid-cols-2 md:grid-cols-3'
           } gap-8`}>
-            {displayCategories.map((category) => (
-              <div 
-                key={category.id || category.name}
-                className="group cursor-pointer"
-              >
-                <Link href={`/shop?category=${category.slug}`} className="block">
-                  <div className="relative h-[480px] overflow-hidden rounded-sm mb-6 bg-secondary/20 border border-border/50">
-                    <img 
-                      src={category.imageUrl || `/categories/${category.slug}.jpg`} 
-                      alt={category.name}
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/25 transition-colors z-10" />
-                    <div className="absolute inset-0 flex items-center justify-center z-20">
-                       <span className="text-white font-bold tracking-widest uppercase text-3xl drop-shadow-md text-center px-4">{category.name}</span>
+            {displayCategories.map((category) => {
+              const subtitle = category.slug === 'attars' 
+                ? 'Pure Concentrated Oils' 
+                : category.slug === 'perfumes' 
+                ? 'Luxury Eau De Parfum' 
+                : 'Royal Incense & Oudh'
+
+              return (
+                <div 
+                  key={category.id || category.name}
+                  className="group cursor-pointer"
+                >
+                  <Link href={`/shop?category=${category.slug}`} className="block">
+                    <div className="relative h-[480px] overflow-hidden rounded-md mb-4 bg-secondary/20 border border-border/50 group-hover:border-accent/60 transition-all duration-500 shadow-md group-hover:shadow-[0_10px_30px_rgba(212,175,55,0.15)]">
+                      <img 
+                        src={category.imageUrl || `/categories/${category.slug}.jpg`} 
+                        alt={category.name}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                      {/* Subtle bottom gradient so the bottle & logo are completely visible and prominent */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity z-10" />
+                      
+                      {/* Bottom card content */}
+                      <div className="absolute bottom-0 inset-x-0 p-6 flex flex-col items-center justify-end z-20 text-center">
+                        <span className="text-[11px] uppercase tracking-[0.25em] text-accent font-semibold mb-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                          {subtitle}
+                        </span>
+                        <h3 className="text-white font-heading font-bold tracking-widest uppercase text-2xl drop-shadow-md group-hover:text-accent transition-colors">
+                          {category.name}
+                        </h3>
+                        <p className="text-[11px] font-semibold text-white/70 mt-2 group-hover:text-accent transition-colors uppercase tracking-widest flex items-center justify-center gap-1.5 transform translate-y-1 group-hover:translate-y-0 opacity-80 group-hover:opacity-100">
+                          Explore Collection <ArrowRight className="w-3.5 h-3.5" />
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <h3 className="text-xl font-heading font-semibold text-center uppercase tracking-widest">{category.name}</h3>
-                  <p className="text-center text-xs font-semibold text-foreground/50 mt-3 group-hover:text-accent transition-colors uppercase tracking-widest flex items-center justify-center gap-2">
-                    Explore <ArrowRight className="w-3 h-3" />
-                  </p>
-                </Link>
-              </div>
-            ))}
+                  </Link>
+                </div>
+              )
+            })}
           </div>
         </Container>
       </section>
