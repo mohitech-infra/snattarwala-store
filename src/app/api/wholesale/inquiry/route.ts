@@ -10,18 +10,16 @@ function getAdminSupabase() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const {
-      fullName,
-      businessName,
-      email,
-      phone,
-      city,
-      businessType,
-      productInterests = [],
-      orderQuantity,
-      gstNumber,
-      message,
-    } = body
+    const fullName = body.fullName || body.contact_person || body.name
+    const businessName = body.businessName || body.company_name || body.business_name
+    const email = body.email
+    const phone = body.phone
+    const city = body.city || (body.state ? `${body.city || ""}, ${body.state}` : "")
+    const businessType = body.businessType || body.business_type
+    const productInterests = body.productInterests || body.product_interests || []
+    const orderQuantity = body.orderQuantity || body.estimated_volume || body.order_quantity
+    const gstNumber = body.gstNumber || body.gstin || body.gst_number
+    const message = body.message || body.notes
 
     if (!fullName || !businessName || !phone || !email) {
       return NextResponse.json(
@@ -48,6 +46,26 @@ export async function POST(req: NextRequest) {
 
     const supabase = getAdminSupabase()
 
+    const leadMeta = {
+      leadNumber: ticketNumber,
+      fullName,
+      businessName,
+      businessType: businessType || "Retail Perfume Store",
+      email,
+      phone,
+      city: city || "Mumbai",
+      gstNumber: gstNumber || null,
+      orderQuantity: orderQuantity || "Starter Wholesale (50 - 100 units)",
+      productInterests: Array.isArray(productInterests) ? productInterests : [productInterests].filter(Boolean),
+      message: message || "Website Wholesale Inquiry",
+      status: "New",
+      priority: "High",
+      estimatedValue: orderQuantity?.includes("2,000") ? 500000 : orderQuantity?.includes("500") ? 200000 : 75000,
+      assignedTo: "SN AttarWala Wholesale Desk",
+      internalNotes: [],
+      createdAt: new Date().toISOString(),
+    }
+
     // 1. Insert into support_tickets table
     try {
       await supabase.from("support_tickets").insert({
@@ -58,6 +76,7 @@ export async function POST(req: NextRequest) {
         phone,
         email,
         message: fullDetails,
+        messages: [leadMeta],
         status: "Open",
         priority: "High",
       })

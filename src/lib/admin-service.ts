@@ -1445,7 +1445,8 @@ export async function getAdminSidebarCounts() {
       { count: abandonedCartsCount },
       { count: customersCount },
       { count: pendingReviewsCount },
-      { count: activeCouponsCount }
+      { count: activeCouponsCount },
+      { count: wholesaleLeadsCount }
     ] = await Promise.all([
       supabase.from("products").select("*", { count: "exact", head: true }),
       supabase.from("products").select("*", { count: "exact", head: true }).lte("stock_quantity", 5),
@@ -1453,7 +1454,8 @@ export async function getAdminSidebarCounts() {
       supabase.from("abandoned_carts").select("*", { count: "exact", head: true }),
       supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
       supabase.from("reviews").select("*", { count: "exact", head: true }).eq("is_approved", false),
-      supabase.from("coupons").select("*", { count: "exact", head: true }).eq("is_active", true)
+      supabase.from("coupons").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("category", "Wholesale").ilike("status", "%open%")
     ])
 
     return {
@@ -1463,7 +1465,8 @@ export async function getAdminSidebarCounts() {
       abandonedCarts: abandonedCartsCount ?? 0,
       customers: customersCount ?? 0,
       pendingReviews: pendingReviewsCount ?? 0,
-      activeCoupons: activeCouponsCount ?? 0
+      activeCoupons: activeCouponsCount ?? 0,
+      wholesaleLeads: wholesaleLeadsCount ?? 0
     }
   } catch {
     return {
@@ -1473,7 +1476,8 @@ export async function getAdminSidebarCounts() {
       abandonedCarts: 0,
       customers: 0,
       pendingReviews: 0,
-      activeCoupons: 0
+      activeCoupons: 0,
+      wholesaleLeads: 0
     }
   }
 }

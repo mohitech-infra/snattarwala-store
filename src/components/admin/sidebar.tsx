@@ -28,7 +28,8 @@ import {
   Store,
   Sparkles,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Briefcase
 } from "lucide-react"
 
 interface SidebarProps {
@@ -51,6 +52,7 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
     customers: number;
     pendingReviews: number;
     activeCoupons: number;
+    wholesaleLeads: number;
   }>({
     products: 0,
     lowStock: 0,
@@ -58,7 +60,8 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
     abandonedCarts: 0,
     customers: 0,
     pendingReviews: 0,
-    activeCoupons: 0
+    activeCoupons: 0,
+    wholesaleLeads: 0
   })
 
   useEffect(() => {
@@ -118,6 +121,19 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
           badgeColor: "text-emerald-500 bg-emerald-500/10" 
         },
         { name: "Returns & Refunds", href: "/admin/returns", icon: RotateCcw }
+      ],
+      allowedRoles: ["admin", "store_manager"]
+    },
+    {
+      title: "B2B & WHOLESALE",
+      items: [
+        { 
+          name: "Wholesale Leads", 
+          href: "/admin/wholesale", 
+          icon: Briefcase,
+          badge: counts.wholesaleLeads > 0 ? `${counts.wholesaleLeads} New` : undefined,
+          badgeColor: "text-amber-500 bg-amber-500/10"
+        }
       ],
       allowedRoles: ["admin", "store_manager"]
     },
