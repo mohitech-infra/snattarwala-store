@@ -10,7 +10,7 @@ import { useEffect, useState } from "react"
 import { getPublicProducts, PublicProduct } from "@/lib/public-service"
 import { getAdminCategories, AdminCategory } from "@/lib/admin-service"
 import { getPublicTestimonials } from "@/lib/store-settings-service"
-import { WholesaleSection } from "@/components/home/wholesale"
+import { AttarSeriesSection } from "@/components/home/wholesale"
 
 export default function Home() {
   const [products, setProducts] = useState<PublicProduct[]>([])
@@ -43,8 +43,7 @@ export default function Home() {
   return (
     <>
       <Hero />
-
-      <WholesaleSection />
+      <AttarSeriesSection />
 
       {/* Shop by Category */}
       <section className="py-24 bg-background">
@@ -61,13 +60,9 @@ export default function Home() {
               ? 'sm:grid-cols-2 lg:grid-cols-4' 
               : 'sm:grid-cols-2 md:grid-cols-3'
           } gap-8`}>
-            {displayCategories.map((category, i) => (
-              <motion.div 
+            {displayCategories.map((category) => (
+              <div 
                 key={category.id || category.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1, duration: 0.8 }}
                 className="group cursor-pointer"
               >
                 <Link href={`/shop?category=${category.slug}`} className="block">
@@ -87,7 +82,7 @@ export default function Home() {
                     Explore <ArrowRight className="w-3 h-3" />
                   </p>
                 </Link>
-              </motion.div>
+              </div>
             ))}
           </div>
         </Container>
@@ -208,12 +203,8 @@ export default function Home() {
               { id: '2', customerName: "Priya M.", rating: 5, text: "Beautiful presentation and the fragrance is divine. The customer service via WhatsApp was incredibly helpful in choosing my signature scent." },
               { id: '3', customerName: "Amit K.", rating: 5, text: "I bought 'For Her' as a gift and my wife loves it. Premium experience from ordering to unboxing. Highly recommended." }
             ]).slice(0, 3).map((review: any, i: number) => (
-              <motion.div 
+              <div 
                 key={review.id || i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1, duration: 0.6 }}
                 className="bg-background p-8 rounded-lg shadow-sm border border-border/50"
               >
                 <div className="flex gap-1 text-yellow-500 mb-4">
@@ -230,7 +221,7 @@ export default function Home() {
                   </div>
                   <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" className="w-4 h-4 ml-auto" />
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </Container>

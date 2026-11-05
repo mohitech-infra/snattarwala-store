@@ -36,6 +36,7 @@ export function Footer() {
               <li><Link href="/shop?gender=women" className="hover:text-accent transition-colors">For Her</Link></li>
               <li><Link href="/shop?gender=unisex" className="hover:text-accent transition-colors">Unisex</Link></li>
               <li><Link href="/shop?premium=true" className="hover:text-accent transition-colors">Premium Collection</Link></li>
+              <li><Link href="/wholesale" className="hover:text-accent transition-colors">Wholesale & Bulk</Link></li>
             </ul>
           </div>
 

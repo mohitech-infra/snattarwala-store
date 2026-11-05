@@ -31,26 +31,12 @@ export default function AdminProductsPage() {
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "active" | "low_stock" | "bestseller">("all")
-  const [isSeeding, setIsSeeding] = useState(false)
 
   const loadProducts = async () => {
     setLoading(true)
     const data = await getAdminProducts()
     setProducts(data)
     setLoading(false)
-  }
-
-  const handleSeedCatalog = async () => {
-    if (!confirm("This will populate your database with 10 luxury artisanal fragrances. Proceed?")) return
-    setIsSeeding(true)
-    const res = await seedCatalogProducts()
-    setIsSeeding(false)
-    if (res.success) {
-      alert(`✅ Successfully imported ${res.count} curated fragrances into your database!`)
-      await loadProducts()
-    } else {
-      alert(`Failed to import catalogue: ${res.error}`)
-    }
   }
 
   useEffect(() => {
@@ -63,6 +49,7 @@ export default function AdminProductsPage() {
     slug: "",
     sku: "",
     category: "Attars",
+    series: "",
     gender: "Unisex",
     fragranceFamily: "Oud",
     price: 1500,
@@ -131,6 +118,7 @@ export default function AdminProductsPage() {
         slug: "",
         sku: "",
         category: "Attars",
+        series: "",
         gender: "Unisex",
         fragranceFamily: "Oud",
         price: 1500,
@@ -340,26 +328,20 @@ export default function AdminProductsPage() {
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-foreground/50">
+                  <td colSpan={7} className="px-5 py-16 text-center text-foreground/50">
                     <div className="flex flex-col items-center justify-center space-y-3 max-w-sm mx-auto">
-                      <Layers className="w-8 h-8 text-foreground/30" />
-                      <p className="font-bold text-foreground">No fragrances in store database</p>
-                      <p className="text-xs text-foreground/50">
-                        Add your first fragrance with photo upload or import the 10 curated starter fragrances.
+                      <Layers className="w-10 h-10 text-accent/50 mb-1" />
+                      <p className="font-bold text-base text-foreground">Catalog is Clean & Ready</p>
+                      <p className="text-xs text-foreground/60 leading-relaxed">
+                        There are 0 products in your store database. You can now list your authentic artisanal fragrances one by one.
                       </p>
-                      <div className="flex items-center gap-2 pt-2">
+                      <div className="pt-2">
                         <button
                           onClick={() => setIsAddModalOpen(true)}
-                          className="px-3.5 py-2 bg-accent text-slate-950 font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-accent/90 transition-colors shadow-sm"
+                          className="px-5 py-2.5 bg-accent text-slate-950 font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-accent/90 transition-colors shadow-sm flex items-center gap-2"
                         >
-                          + Add Fragrance
-                        </button>
-                        <button
-                          onClick={handleSeedCatalog}
-                          disabled={isSeeding}
-                          className="px-3.5 py-2 bg-secondary border border-border text-foreground hover:text-accent text-xs font-semibold uppercase tracking-wider rounded-sm transition-colors"
-                        >
-                          {isSeeding ? "Importing..." : "⚡ Seed 10 Starter Fragrances"}
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Your First Fragrance</span>
                         </button>
                       </div>
                     </div>
@@ -390,10 +372,21 @@ export default function AdminProductsPage() {
                         </div>
                       </td>
 
-                      {/* Category & Notes */}
+                      {/* Category, Series & Notes */}
                       <td className="px-5 py-4">
                         <span className="font-semibold text-foreground">{product.category}</span>
-                        <p className="text-[10px] text-foreground/50">{product.gender} • {product.fragranceFamily}</p>
+                        {product.series && (
+                          <span className={`block mt-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs w-fit ${
+                            product.series === "Golden Series" 
+                              ? "bg-[#d4af37]/15 text-[#997300] dark:text-[#f3d267] border border-[#d4af37]/30"
+                              : product.series === "Diamond Series"
+                              ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-400/30"
+                              : "bg-amber-600/15 text-amber-800 dark:text-amber-300 border border-amber-600/30"
+                          }`}>
+                            {product.series}
+                          </span>
+                        )}
+                        <p className="text-[10px] text-foreground/50 mt-0.5">{product.gender} • {product.fragranceFamily}</p>
                         <p className="text-[10px] text-accent font-medium mt-1 truncate max-w-[150px]">
                           {product.notes.top.join(", ")}
                         </p>
@@ -518,7 +511,7 @@ export default function AdminProductsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Category</label>
                     <select
@@ -529,6 +522,21 @@ export default function AdminProductsPage() {
                       <option value="Attars">Attars</option>
                       <option value="Perfumes">Perfumes</option>
                       <option value="Bakhoor">Bakhoor</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-accent font-bold block mb-1.5">
+                      Fragrance Series ⭐
+                    </label>
+                    <select
+                      value={newProduct.series || ""}
+                      onChange={(e) => setNewProduct({...newProduct, series: e.target.value || null})}
+                      className="w-full bg-background border-2 border-accent/60 rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground font-semibold"
+                    >
+                      <option value="">None (Standard Catalog)</option>
+                      <option value="Golden Series">👑 Golden Series (₹300 - ₹999)</option>
+                      <option value="Diamond Series">💎 Diamond Series (₹549 - ₹1,999)</option>
+                      <option value="Luxury Series">✨ Luxury Series (₹1,099 - ₹2,999)</option>
                     </select>
                   </div>
                   <div>
@@ -770,7 +778,7 @@ export default function AdminProductsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Category</label>
                     <select
@@ -781,6 +789,21 @@ export default function AdminProductsPage() {
                       <option value="Attars">Attars</option>
                       <option value="Perfumes">Perfumes</option>
                       <option value="Bakhoor">Bakhoor</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-accent font-bold block mb-1.5">
+                      Fragrance Series ⭐
+                    </label>
+                    <select
+                      value={editingProduct.series || ""}
+                      onChange={(e) => setEditingProduct({...editingProduct, series: e.target.value || null})}
+                      className="w-full bg-background border-2 border-accent/60 rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground font-semibold"
+                    >
+                      <option value="">None (Standard Catalog)</option>
+                      <option value="Golden Series">👑 Golden Series (₹300 - ₹999)</option>
+                      <option value="Diamond Series">💎 Diamond Series (₹549 - ₹1,999)</option>
+                      <option value="Luxury Series">✨ Luxury Series (₹1,099 - ₹2,999)</option>
                     </select>
                   </div>
                   <div>

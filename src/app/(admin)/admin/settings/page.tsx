@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import { 
   Settings, Store, Bell, Shield, CreditCard, Truck,
-  Save, Check, MapPin
+  Save, Check, MapPin, Tag, Plus, Trash2
 } from "lucide-react"
 import { getStorePolicies, saveStorePolicies, DEFAULT_STORE_POLICIES, StorePolicies } from "@/lib/policies-service"
 import { getStoreSettings, saveStoreSettings, StoreSettings, DEFAULT_STORE_SETTINGS } from "@/lib/store-settings-service"
+import { getWholesaleRates, saveWholesaleRates, DEFAULT_WHOLESALE_RATES, WholesaleRates } from "@/lib/wholesale-rates-service"
 
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false)
@@ -17,16 +18,19 @@ export default function AdminSettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [policies, setPolicies] = useState<StorePolicies>(DEFAULT_STORE_POLICIES)
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS)
+  const [wholesaleRates, setWholesaleRates] = useState<WholesaleRates>(DEFAULT_WHOLESALE_RATES)
 
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true)
-      const [storeData, policiesData] = await Promise.all([
+      const [storeData, policiesData, ratesData] = await Promise.all([
         getStoreSettings(),
-        getStorePolicies()
+        getStorePolicies(),
+        getWholesaleRates()
       ])
       setSettings(storeData)
       setPolicies(policiesData)
+      setWholesaleRates(ratesData)
       setLoading(false)
     }
     loadAll()
@@ -36,7 +40,8 @@ export default function AdminSettingsPage() {
     setSaving(true)
     await Promise.all([
       saveStoreSettings(settings),
-      saveStorePolicies({ ...policies, freeShippingThreshold: settings.freeShippingAbove })
+      saveStorePolicies({ ...policies, freeShippingThreshold: settings.freeShippingAbove }),
+      saveWholesaleRates(wholesaleRates)
     ])
     setSaving(false)
     setSaved(true)
@@ -48,6 +53,7 @@ export default function AdminSettingsPage() {
     { id: "locations", label: "Store Locations", icon: MapPin },
     { id: "payments", label: "Payments", icon: CreditCard },
     { id: "shipping", label: "Shipping", icon: Truck },
+    { id: "wholesale", label: "Attar Series Rates", icon: Tag },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "security", label: "Security", icon: Shield }
   ]
@@ -257,6 +263,120 @@ export default function AdminSettingsPage() {
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Wholesale Rates Tab */}
+          {activeTab === "wholesale" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                <h3 className="font-heading font-bold text-sm text-accent uppercase tracking-wider">Attar Series Rates</h3>
+                <p className="text-[10px] text-foreground/50">Changes reflect live on the website Attar Series section</p>
+              </div>
+
+              {wholesaleRates.attarSeries.map((series, si) => (
+                <div key={si} className="p-4 bg-secondary/20 rounded-lg border border-border/50 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60 block mb-1.5">Series Name</label>
+                      <input
+                        type="text"
+                        value={series.name}
+                        onChange={e => {
+                          const updated = [...wholesaleRates.attarSeries]
+                          updated[si] = { ...updated[si], name: e.target.value }
+                          setWholesaleRates({ attarSeries: updated })
+                        }}
+                        className="w-full bg-background border border-border rounded-sm py-2.5 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60 block mb-1.5">Eyebrow Label</label>
+                      <input
+                        type="text"
+                        value={series.eyebrow}
+                        onChange={e => {
+                          const updated = [...wholesaleRates.attarSeries]
+                          updated[si] = { ...updated[si], eyebrow: e.target.value }
+                          setWholesaleRates({ attarSeries: updated })
+                        }}
+                        className="w-full bg-background border border-border rounded-sm py-2.5 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60 block mb-1.5">Description</label>
+                      <input
+                        type="text"
+                        value={series.description}
+                        onChange={e => {
+                          const updated = [...wholesaleRates.attarSeries]
+                          updated[si] = { ...updated[si], description: e.target.value }
+                          setWholesaleRates({ attarSeries: updated })
+                        }}
+                        className="w-full bg-background border border-border rounded-sm py-2.5 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60 mb-2">Size Prices</p>
+                    <div className="space-y-2">
+                      {series.prices.map((item, pi) => (
+                        <div key={pi} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item.size}
+                            placeholder="e.g. 12 ml"
+                            onChange={e => {
+                              const updated = [...wholesaleRates.attarSeries]
+                              const prices = [...updated[si].prices]
+                              prices[pi] = { ...prices[pi], size: e.target.value }
+                              updated[si] = { ...updated[si], prices }
+                              setWholesaleRates({ attarSeries: updated })
+                            }}
+                            className="w-28 bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
+                          />
+                          <span className="text-foreground/40 text-xs">₹</span>
+                          <input
+                            type="number"
+                            value={item.price}
+                            onChange={e => {
+                              const updated = [...wholesaleRates.attarSeries]
+                              const prices = [...updated[si].prices]
+                              prices[pi] = { ...prices[pi], price: Number(e.target.value) }
+                              updated[si] = { ...updated[si], prices }
+                              setWholesaleRates({ attarSeries: updated })
+                            }}
+                            className="flex-1 bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...wholesaleRates.attarSeries]
+                              updated[si] = { ...updated[si], prices: updated[si].prices.filter((_, i) => i !== pi) }
+                              setWholesaleRates({ attarSeries: updated })
+                            }}
+                            className="p-1.5 text-destructive/60 hover:text-destructive transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...wholesaleRates.attarSeries]
+                          updated[si] = { ...updated[si], prices: [...updated[si].prices, { size: "", price: 0 }] }
+                          setWholesaleRates({ attarSeries: updated })
+                        }}
+                        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent hover:text-accent/80 transition-colors mt-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add size
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

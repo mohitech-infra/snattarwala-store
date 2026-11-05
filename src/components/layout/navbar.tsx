@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { Search, User, Heart, ShoppingBag, Menu, X } from "lucide-react"
 import { useState } from "react"
 import { Container } from "./container"
@@ -32,14 +31,16 @@ export function Navbar() {
           {/* Logo */}
           <div className="flex-1 md:flex-none flex justify-center md:justify-start">
             <Link href="/" className="flex items-center md:space-x-3">
-              {/* Logo Image: Large on mobile (h-14), normal on desktop (md:h-10) */}
-              <Image 
+              {/* Logo Image: Instant high-priority paint without hydration pop-in */}
+              <img 
                 src="/logo.png" 
                 alt="SN AttarWala" 
                 width={160} 
                 height={80} 
+                fetchPriority="high"
+                decoding="sync"
+                loading="eager"
                 className="h-14 w-auto md:h-10 object-contain dark:invert"
-                priority
               />
               {/* Brand Name Text: Hidden on mobile, visible on desktop */}
               <span className="font-heading text-2xl font-bold tracking-wider uppercase hidden md:inline-block">

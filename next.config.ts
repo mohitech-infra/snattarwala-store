@@ -1,6 +1,10 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   // Free up RAM by quickly purging inactive pages from memory
   onDemandEntries: {
     maxInactiveAge: 15 * 1000,

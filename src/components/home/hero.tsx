@@ -54,7 +54,7 @@ export function Hero() {
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
           poster="/hero-poster.webp"
           onCanPlayThrough={handleVideoReady}
           onPlaying={() => setIsVideoLoaded(true)}
@@ -93,16 +93,16 @@ export function Hero() {
               Shop Collection
             </Link>
             <Link 
-              href="/collections/premium"
+              href="/collections"
               className="px-8 py-4 bg-transparent border border-white text-white font-medium tracking-wide uppercase text-sm hover:bg-white/10 transition-colors w-full sm:w-auto backdrop-blur-xs"
             >
-              Explore Premium
+              Explore Collections
             </Link>
             <Link
-              href="#wholesale"
+              href="#attar-series"
               className="px-8 py-4 bg-accent/90 text-black font-medium tracking-wide uppercase text-sm hover:bg-accent transition-colors w-full sm:w-auto shadow-lg"
             >
-              Wholesale Rates
+              Attar Series
             </Link>
           </div>
         </motion.div>

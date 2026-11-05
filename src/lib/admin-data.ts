@@ -25,6 +25,8 @@ export interface AdminProduct {
   isFeatured?: boolean;
   isBestseller?: boolean;
   isNewArrival?: boolean;
+  series?: "Golden Series" | "Diamond Series" | "Luxury Series" | string | null;
+  tags?: string[];
 }
 
 export interface AdminOrder {
@@ -209,7 +211,8 @@ export const INITIAL_ADMIN_PRODUCTS: AdminProduct[] = [
       base: ["White Amber", "Crystal Musk"]
     },
     isFeatured: true,
-    isBestseller: true
+    isBestseller: true,
+    series: "Luxury Series"
   },
   {
     id: "attar-2",
@@ -240,7 +243,8 @@ export const INITIAL_ADMIN_PRODUCTS: AdminProduct[] = [
       base: ["Vanilla Beans", "Tonka Bean", "Amberwood", "Myrrh"]
     },
     isFeatured: true,
-    isNewArrival: true
+    isNewArrival: true,
+    series: "Diamond Series"
   },
   {
     id: "attar-3",
@@ -270,7 +274,8 @@ export const INITIAL_ADMIN_PRODUCTS: AdminProduct[] = [
       heart: ["Jasmine Sambac", "Lily of the Valley"],
       base: ["Velvet Musk", "Cedarwood"]
     },
-    isBestseller: true
+    isBestseller: true,
+    series: "Golden Series"
   },
   {
     id: "perfume-1",
@@ -330,7 +335,8 @@ export const INITIAL_ADMIN_PRODUCTS: AdminProduct[] = [
       heart: ["Sea Salt", "Sage", "Lavender"],
       base: ["Driftwood", "Mineral Amber", "Musk"]
     },
-    isBestseller: true
+    isBestseller: true,
+    series: "Golden Series"
   },
   {
     id: "perfume-3",
@@ -361,7 +367,8 @@ export const INITIAL_ADMIN_PRODUCTS: AdminProduct[] = [
       base: ["Cambodian Oud", "Leather", "Ambergris"]
     },
     isFeatured: true,
-    isNewArrival: true
+    isNewArrival: true,
+    series: "Diamond Series"
   },
   {
     id: "perfume-4",
@@ -391,7 +398,8 @@ export const INITIAL_ADMIN_PRODUCTS: AdminProduct[] = [
       heart: ["Smoky Cinnamon", "Cedarwood", "Iris"],
       base: ["Dark Amber", "Vanilla", "Sandalwood"]
     },
-    isBestseller: true
+    isBestseller: true,
+    series: "Golden Series"
   },
   {
     id: "perfume-5",
@@ -451,7 +459,8 @@ export const INITIAL_ADMIN_PRODUCTS: AdminProduct[] = [
       base: ["Sweet Vanilla", "Frankincense", "Amber"]
     },
     isFeatured: true,
-    isBestseller: true
+    isBestseller: true,
+    series: "Luxury Series"
   },
   {
     id: "bakhoor-2",

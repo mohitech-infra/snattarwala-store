@@ -28,6 +28,7 @@ export interface AdminProduct {
   is_active?: boolean
   description?: string
   shortDescription?: string
+  series?: "Golden Series" | "Diamond Series" | "Luxury Series" | string | null
 }
 
 export interface AdminOrder {
@@ -160,8 +161,17 @@ export interface AdminAbandonedCart {
 let hasAttemptedSeed = false
 
 export async function ensureDatabaseSeeded(): Promise<void> {
-  // Removed dummy seed logic
-  return
+  if (hasAttemptedSeed) return
+  hasAttemptedSeed = true
+  try {
+    const supabase = createClient()
+    const { count } = await supabase.from("products").select("id", { count: "exact", head: true })
+    if (count === 0) {
+      await seedCatalogProducts()
+    }
+  } catch (err) {
+    console.warn("ensureDatabaseSeeded check:", err)
+  }
 }
 
 // -------------------------------------------------------------
@@ -178,7 +188,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
         id, name, slug, sku, price, compare_at_price, stock_quantity,
         gender, fragrance_type, top_notes, middle_notes, base_notes,
         rating, review_count, featured, best_seller, new_arrival, is_active,
-        image_url, description, short_description,
+        image_url, description, short_description, tags,
         category:categories(name),
         images:product_images(image_url, is_primary)
       `)
@@ -290,6 +300,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
         isBestseller: p.best_seller,
         isNewArrival: p.new_arrival,
         is_active: p.is_active,
+        series: p.series || (Array.isArray(p.tags) ? p.tags.find((t: string) => typeof t === "string" && t.includes("Series")) : null) || null,
       }
     })
   } catch (err) {
@@ -330,32 +341,45 @@ export async function createAdminProduct(productData: Partial<AdminProduct>): Pr
     const categoryId = categoryMap[categoryName] || categoryMap["Attars"]
     const imgUrl = productData.imageUrl || "/products/white-oudh-attar.jpg"
 
-    const { data: newProd, error } = await supabase
+    const insertPayload: Record<string, any> = {
+      name: productData.name,
+      slug: slug,
+      sku: productData.sku,
+      category: categoryName,
+      category_id: categoryId,
+      image_url: imgUrl,
+      description: productData.description || `Exquisite luxury fragrance crafted by SN AttarWala.`,
+      short_description: productData.shortDescription || productData.name,
+      price: productData.price || 1500,
+      compare_at_price: productData.salePrice || null,
+      stock_quantity: productData.stock || 20,
+      gender: productData.gender || "Unisex",
+      fragrance_type: categoryName === "Attars" ? "Attar Oil" : categoryName === "Bakhoor" ? "Incense Wood" : "Eau De Parfum",
+      top_notes: Array.isArray(productData.notes?.top) ? productData.notes.top.join(", ") : (productData.notes?.top || "Bergamot"),
+      middle_notes: Array.isArray(productData.notes?.heart) ? productData.notes.heart.join(", ") : (productData.notes?.heart || "Rose"),
+      base_notes: Array.isArray(productData.notes?.base) ? productData.notes.base.join(", ") : (productData.notes?.base || "Oud"),
+      featured: Boolean(productData.isFeatured),
+      best_seller: Boolean(productData.isBestseller),
+      new_arrival: Boolean(productData.isNewArrival),
+      is_active: true,
+      tags: productData.series ? [productData.series] : [],
+    }
+    if (productData.series) {
+      insertPayload.series = productData.series
+    }
+
+    let { data: newProd, error } = await supabase
       .from("products")
-      .insert({
-        name: productData.name,
-        slug: slug,
-        sku: productData.sku,
-        category: categoryName,
-        category_id: categoryId,
-        image_url: imgUrl,
-        description: productData.description || `Exquisite luxury fragrance crafted by SN AttarWala.`,
-        short_description: productData.shortDescription || productData.name,
-        price: productData.price || 1500,
-        compare_at_price: productData.salePrice || null,
-        stock_quantity: productData.stock || 20,
-        gender: productData.gender || "Unisex",
-        fragrance_type: categoryName === "Attars" ? "Attar Oil" : categoryName === "Bakhoor" ? "Incense Wood" : "Eau De Parfum",
-        top_notes: Array.isArray(productData.notes?.top) ? productData.notes.top.join(", ") : (productData.notes?.top || "Bergamot"),
-        middle_notes: Array.isArray(productData.notes?.heart) ? productData.notes.heart.join(", ") : (productData.notes?.heart || "Rose"),
-        base_notes: Array.isArray(productData.notes?.base) ? productData.notes.base.join(", ") : (productData.notes?.base || "Oud"),
-        featured: Boolean(productData.isFeatured),
-        best_seller: Boolean(productData.isBestseller),
-        new_arrival: Boolean(productData.isNewArrival),
-        is_active: true,
-      })
+      .insert(insertPayload)
       .select()
       .single()
+
+    if (error && error.message?.includes("series")) {
+      delete insertPayload.series
+      const retry = await supabase.from("products").insert(insertPayload).select().single()
+      newProd = retry.data
+      error = retry.error
+    }
 
     if (error) throw error
 
@@ -421,8 +445,17 @@ export async function updateAdminProduct(id: string, updates: Partial<AdminProdu
     if (updates.isFeatured !== undefined) payload.featured = updates.isFeatured
     if (updates.isBestseller !== undefined) payload.best_seller = updates.isBestseller
     if (updates.isNewArrival !== undefined) payload.new_arrival = updates.isNewArrival
+    if (updates.series !== undefined) {
+      payload.tags = updates.series ? [updates.series] : []
+      payload.series = updates.series || null
+    }
 
-    const { error } = await supabase.from("products").update(payload).eq("id", id)
+    let { error } = await supabase.from("products").update(payload).eq("id", id)
+    if (error && error.message?.includes("series")) {
+      delete payload.series
+      const retry = await supabase.from("products").update(payload).eq("id", id)
+      error = retry.error
+    }
     if (error) {
       console.error("Error updating product:", error)
       return false
@@ -508,6 +541,7 @@ export async function seedCatalogProducts(): Promise<{ success: boolean; count: 
           best_seller: Boolean(p.isBestseller),
           new_arrival: Boolean(p.isNewArrival),
           is_active: true,
+          tags: p.series ? [p.series] : [],
         })
         .select()
         .single()

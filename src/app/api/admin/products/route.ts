@@ -39,32 +39,46 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase()
 
-    const { data: newProd, error } = await supabase
+    const insertPayload: Record<string, any> = {
+      name,
+      slug,
+      sku,
+      category, // Guarantees NOT NULL constraint is always satisfied
+      category_id,
+      image_url,
+      price,
+      compare_at_price: body.salePrice || body.compare_at_price || null,
+      stock_quantity: Number(body.stock ?? body.stock_quantity) || 20,
+      gender: body.gender || "Unisex",
+      fragrance_type: category === "Attars" ? "Attar Oil" : category === "Bakhoor" ? "Incense Wood" : "Eau De Parfum",
+      top_notes: topNotes,
+      middle_notes: heartNotes,
+      base_notes: baseNotes,
+      description: body.description || `Exquisite luxury ${name} crafted by SN AttarWala.`,
+      short_description: body.shortDescription || body.short_description || name,
+      featured: Boolean(body.isFeatured),
+      best_seller: Boolean(body.isBestseller),
+      new_arrival: Boolean(body.isNewArrival),
+      is_active: true,
+      tags: body.series ? [body.series] : (Array.isArray(body.tags) ? body.tags : []),
+    }
+    if (body.series) {
+      insertPayload.series = body.series
+    }
+
+    let { data: newProd, error } = await supabase
       .from("products")
-      .insert({
-        name,
-        slug,
-        sku,
-        category, // Guarantees NOT NULL constraint is always satisfied
-        category_id,
-        image_url,
-        price,
-        compare_at_price: body.salePrice || body.compare_at_price || null,
-        stock_quantity: Number(body.stock ?? body.stock_quantity) || 20,
-        gender: body.gender || "Unisex",
-        fragrance_type: category === "Attars" ? "Attar Oil" : category === "Bakhoor" ? "Incense Wood" : "Eau De Parfum",
-        top_notes: topNotes,
-        middle_notes: heartNotes,
-        base_notes: baseNotes,
-        description: body.description || `Exquisite luxury ${name} crafted by SN AttarWala.`,
-        short_description: body.shortDescription || body.short_description || name,
-        featured: Boolean(body.isFeatured),
-        best_seller: Boolean(body.isBestseller),
-        new_arrival: Boolean(body.isNewArrival),
-        is_active: true,
-      })
+      .insert(insertPayload)
       .select()
       .single()
+
+    // If 'series' column is not yet added to the schema, gracefully retry without it (series is preserved in tags)
+    if (error && error.message?.includes("series")) {
+      delete insertPayload.series
+      const retry = await supabase.from("products").insert(insertPayload).select().single()
+      newProd = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error("Supabase insert error:", error)
@@ -129,14 +143,25 @@ export async function PATCH(req: NextRequest) {
     if (updates.best_seller !== undefined) payload.best_seller = updates.best_seller
     if (updates.isNewArrival !== undefined) payload.new_arrival = updates.isNewArrival
     if (updates.new_arrival !== undefined) payload.new_arrival = updates.new_arrival
+    if (updates.series !== undefined) {
+      payload.tags = updates.series ? [updates.series] : []
+      payload.series = updates.series || null
+    }
 
     const supabase = getSupabase()
-    const { data: updated, error } = await supabase
+    let { data: updated, error } = await supabase
       .from("products")
       .update(payload)
       .eq("id", id)
       .select()
       .single()
+
+    if (error && error.message?.includes("series")) {
+      delete payload.series
+      const retry = await supabase.from("products").update(payload).eq("id", id).select().single()
+      updated = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error("Supabase update error:", error)

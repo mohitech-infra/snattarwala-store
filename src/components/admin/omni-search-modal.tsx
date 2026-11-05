@@ -14,7 +14,7 @@ import {
   ArrowRight,
   Sparkles
 } from "lucide-react"
-import { INITIAL_ADMIN_PRODUCTS, INITIAL_ADMIN_ORDERS, INITIAL_ADMIN_CUSTOMERS } from "@/lib/admin-data"
+import { getAdminProducts, getAdminOrders, getAdminCustomers, type AdminProduct, type AdminOrder, type AdminCustomer } from "@/lib/admin-service"
 
 interface OmniSearchProps {
   isOpen: boolean;
@@ -23,7 +23,18 @@ interface OmniSearchProps {
 
 export function OmniSearchModal({ isOpen, onClose }: OmniSearchProps) {
   const [query, setQuery] = useState("")
+  const [products, setProducts] = useState<AdminProduct[]>([])
+  const [orders, setOrders] = useState<AdminOrder[]>([])
+  const [customers, setCustomers] = useState<AdminCustomer[]>([])
   const router = useRouter()
+
+  useEffect(() => {
+    if (isOpen) {
+      getAdminProducts().then(setProducts)
+      getAdminOrders().then(setOrders)
+      getAdminCustomers().then(setCustomers)
+    }
+  }, [isOpen])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -45,15 +56,15 @@ export function OmniSearchModal({ isOpen, onClose }: OmniSearchProps) {
   const cleanQuery = query.toLowerCase().trim()
 
   const matchedProducts = cleanQuery
-    ? INITIAL_ADMIN_PRODUCTS.filter(p => p.name.toLowerCase().includes(cleanQuery) || p.sku.toLowerCase().includes(cleanQuery) || p.category.toLowerCase().includes(cleanQuery)).slice(0, 4)
-    : INITIAL_ADMIN_PRODUCTS.slice(0, 3)
+    ? products.filter(p => p.name.toLowerCase().includes(cleanQuery) || p.sku.toLowerCase().includes(cleanQuery) || p.category.toLowerCase().includes(cleanQuery)).slice(0, 4)
+    : products.slice(0, 3)
 
   const matchedOrders = cleanQuery
-    ? INITIAL_ADMIN_ORDERS.filter(o => o.orderNumber.toLowerCase().includes(cleanQuery) || o.customer.name.toLowerCase().includes(cleanQuery)).slice(0, 3)
-    : INITIAL_ADMIN_ORDERS.slice(0, 2)
+    ? orders.filter(o => o.orderNumber.toLowerCase().includes(cleanQuery) || o.customer.name.toLowerCase().includes(cleanQuery)).slice(0, 3)
+    : orders.slice(0, 2)
 
   const matchedCustomers = cleanQuery
-    ? INITIAL_ADMIN_CUSTOMERS.filter(c => c.name.toLowerCase().includes(cleanQuery) || c.email.toLowerCase().includes(cleanQuery) || c.phone.includes(cleanQuery)).slice(0, 3)
+    ? customers.filter(c => c.name.toLowerCase().includes(cleanQuery) || c.email.toLowerCase().includes(cleanQuery) || c.phone.includes(cleanQuery)).slice(0, 3)
     : []
 
   const quickNav = [

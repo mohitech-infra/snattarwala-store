@@ -1,4 +1,5 @@
 import { createClient } from "./supabase/client"
+import { DUMMY_PRODUCTS } from "./products"
 
 export interface PublicProduct {
   id: string
@@ -12,7 +13,7 @@ export interface PublicProduct {
   category: string
   brand?: string
   gender?: string
-  fragranceFamily?: string
+  fragranceFamily?: string | null
   fragranceNotes?: string[]
   topNotes?: string[]
   middleNotes?: string[]
@@ -31,6 +32,43 @@ export interface PublicProduct {
   stockQuantity?: number
   imageUrl: string
   imageGallery: string[]
+  series?: "Golden Series" | "Diamond Series" | "Luxury Series" | string | null
+}
+
+function mapDummyProducts(): PublicProduct[] {
+  return DUMMY_PRODUCTS.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    description: p.description,
+    shortDescription: p.shortDescription || p.description,
+    price: p.price,
+    compareAtPrice: p.compareAtPrice ?? null,
+    sku: p.sku || "",
+    category: p.category,
+    brand: p.brand,
+    gender: p.gender || "Unisex",
+    fragranceFamily: p.fragranceFamily || null,
+    fragranceNotes: p.fragranceNotes || [],
+    topNotes: p.topNotes || [],
+    middleNotes: p.middleNotes || [],
+    baseNotes: p.baseNotes || [],
+    longevity: p.longevity || "8-12 Hours",
+    sillage: "Moderate to Heavy",
+    season: ["All Seasons"],
+    sizes: p.sizes || ["100ml"],
+    rating: p.rating || 4.8,
+    reviews: p.reviews || 50,
+    isFeatured: Boolean(p.isFeatured),
+    isBestseller: Boolean(p.isBestseller),
+    isNewArrival: Boolean(p.isNewArrival),
+    isReplica: Boolean(p.isReplica),
+    inStock: p.inStock ?? true,
+    stockQuantity: 25,
+    imageUrl: p.imageUrl || "/products/white-oudh-attar.jpg",
+    imageGallery: p.galleryImages?.length ? p.galleryImages : [p.imageUrl || "/products/white-oudh-attar.jpg"],
+    series: p.series || null,
+  }))
 }
 
 export async function getPublicProducts(): Promise<PublicProduct[]> {
@@ -45,11 +83,14 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
       `)
       .eq("is_active", true)
 
-    if (error || !data) return []
+    if (error || !data || data.length === 0) {
+      return mapDummyProducts()
+    }
 
     return data.map((p: any) => {
       const allImages = p.images?.map((img: any) => img.image_url) || []
-      const primaryImg = p.images?.find((img: any) => img.is_primary)?.image_url || allImages[0] || "/products/white-oudh-attar.jpg"
+      const primaryImg = p.images?.find((img: any) => img.is_primary)?.image_url || allImages[0] || p.image_url || "/products/white-oudh-attar.jpg"
+      const seriesTag = Array.isArray(p.tags) ? p.tags.find((t: string) => typeof t === "string" && t.includes("Series")) : null
 
       return {
         id: p.id,
@@ -60,7 +101,7 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
         price: Number(p.price),
         compareAtPrice: p.compare_at_price ? Number(p.compare_at_price) : null,
         sku: p.sku || "",
-        category: p.category?.name || "Uncategorized",
+        category: p.category?.name || p.category || "Uncategorized",
         gender: p.gender || "Unisex",
         fragranceFamily: p.fragrance_family || null,
         fragranceNotes: [p.top_notes, p.middle_notes, p.base_notes].filter(Boolean),
@@ -79,10 +120,11 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
         inStock: (p.stock_quantity ?? 10) > 0,
         stockQuantity: p.stock_quantity ?? 10,
         imageUrl: primaryImg,
-        imageGallery: allImages,
+        imageGallery: allImages.length > 0 ? allImages : [primaryImg],
+        series: p.series || seriesTag || null,
       }
     })
   } catch (err) {
-    return []
+    return mapDummyProducts()
   }
 }

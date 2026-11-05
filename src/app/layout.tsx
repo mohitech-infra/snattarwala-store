@@ -11,11 +11,13 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const playfair = Playfair_Display({
   variable: "--font-heading",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -51,6 +53,7 @@ export default function RootLayout({
       className={`${inter.variable} ${playfair.variable} h-full antialiased`}
     >
       <head>
+        <link rel="preload" as="image" href="/logo.png" type="image/png" fetchPriority="high" />
         <link rel="preload" as="image" href="/hero-poster.webp" type="image/webp" fetchPriority="high" />
       </head>
       <body className="min-h-full flex flex-col font-sans">

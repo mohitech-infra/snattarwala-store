@@ -27,6 +27,7 @@ export interface Product {
   isBestseller: boolean;
   isNewArrival: boolean;
   isReplica?: boolean;
+  series?: "Golden Series" | "Diamond Series" | "Luxury Series";
   tags: string[];
 }
 
@@ -55,6 +56,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     isFeatured: true,
     isBestseller: true,
     isNewArrival: false,
+    series: "Luxury Series",
     tags: ["Woody", "Amber", "Earthy", "Green", "Floral"]
   },
   {
@@ -81,6 +83,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     isFeatured: true,
     isBestseller: false,
     isNewArrival: true,
+    series: "Diamond Series",
     tags: ["Vanilla", "Woody", "Musk", "Amber", "Powdery"]
   },
   {
@@ -106,6 +109,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     isFeatured: false,
     isBestseller: true,
     isNewArrival: false,
+    series: "Golden Series",
     tags: ["Floral", "Musk", "Woody", "Citrus"]
   },
 
