@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { 
   Settings, Store, Bell, Shield, CreditCard, Truck,
-  Save, Check, MapPin, Tag, Plus, Trash2
+  Save, Check, MapPin, Tag, Plus, Trash2, Megaphone, Eye, EyeOff
 } from "lucide-react"
 import { getStorePolicies, saveStorePolicies, DEFAULT_STORE_POLICIES, StorePolicies } from "@/lib/policies-service"
 import { getStoreSettings, saveStoreSettings, StoreSettings, DEFAULT_STORE_SETTINGS } from "@/lib/store-settings-service"
@@ -134,6 +134,39 @@ export default function AdminSettingsPage() {
             <div className="space-y-5">
               <h3 className="font-heading font-bold text-base border-b border-border/50 pb-3 text-accent uppercase tracking-wider text-sm">Store Identity</h3>
               
+              {/* Storefront Top Offer Bar Toggle */}
+              <div className="p-4 bg-accent/5 border border-accent/30 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-accent/15 text-accent rounded-sm mt-0.5">
+                      <Megaphone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-heading font-bold text-xs uppercase tracking-wider text-foreground">
+                        Top Announcement & Offer Panel
+                      </p>
+                      <p className="text-[11px] text-foreground/60 mt-0.5">
+                        Controls whether the promotional discount/coupon ticker is displayed at the very top of the storefront.
+                      </p>
+                    </div>
+                  </div>
+                  <Toggle 
+                    val={settings.showOfferBar} 
+                    onChange={() => setSettings({ ...settings, showOfferBar: !settings.showOfferBar })} 
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-border/40 text-[10px]">
+                  <span className={`px-2 py-0.5 rounded-xs font-bold uppercase tracking-wider ${settings.showOfferBar ? "bg-emerald-500/15 text-emerald-600" : "bg-destructive/15 text-destructive"}`}>
+                    {settings.showOfferBar ? "Active on Storefront" : "Completely Disabled"}
+                  </span>
+                  <span className="text-foreground/50">
+                    {settings.showOfferBar 
+                      ? "The top offer banner is currently active across the home screen and store pages." 
+                      : "The top offer bar is completely disabled and hidden from all visitors."}
+                  </span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Store Name" value={settings.storeName} onChange={v => setSettings({...settings, storeName: v})} />
                 <Input label="Brand Tagline" value={settings.tagline} onChange={v => setSettings({...settings, tagline: v})} />

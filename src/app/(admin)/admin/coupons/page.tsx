@@ -6,6 +6,7 @@ import {
   Calendar, Tag, Users, TrendingUp, Sparkles, X, RefreshCw
 } from "lucide-react"
 import { getAdminCoupons, createAdminCoupon, toggleAdminCoupon, deleteAdminCoupon, AdminCoupon } from "@/lib/admin-service"
+import { getStoreSettings, saveStoreSettings } from "@/lib/store-settings-service"
 import { ExportMenu } from "@/components/admin/export-menu"
 
 export default function AdminCouponsPage() {
@@ -13,6 +14,8 @@ export default function AdminCouponsPage() {
   const [loading, setLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [offerBarEnabled, setOfferBarEnabled] = useState(true)
+  const [togglingBanner, setTogglingBanner] = useState(false)
   const [newCoupon, setNewCoupon] = useState({
     code: "", type: "Percentage", value: 10, minOrder: 1500,
     validFrom: "", validUntil: "", maxUses: 100
@@ -20,12 +23,26 @@ export default function AdminCouponsPage() {
 
   const loadCoupons = async () => {
     setLoading(true)
-    const data = await getAdminCoupons()
+    const [data, settings] = await Promise.all([
+      getAdminCoupons(),
+      getStoreSettings()
+    ])
     setCoupons(data)
+    if (settings) {
+      setOfferBarEnabled(settings.showOfferBar !== false)
+    }
     setLoading(false)
   }
 
   useEffect(() => { loadCoupons() }, [])
+
+  const handleToggleOfferBar = async () => {
+    setTogglingBanner(true)
+    const nextVal = !offerBarEnabled
+    await saveStoreSettings({ showOfferBar: nextVal })
+    setOfferBarEnabled(nextVal)
+    setTogglingBanner(false)
+  }
 
   const copyCode = (id: string, code: string) => {
     navigator.clipboard.writeText(code)
@@ -122,6 +139,43 @@ export default function AdminCouponsPage() {
             Create Coupon
           </button>
         </div>
+      </div>
+
+      {/* Storefront Top Offer Bar Toggle Banner */}
+      <div className="p-4 bg-card border border-border/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-sm ${offerBarEnabled ? "bg-accent/15 text-accent" : "bg-destructive/15 text-destructive"}`}>
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="font-heading font-bold text-xs uppercase tracking-wider text-foreground">
+                Top Home Screen Offer Panel
+              </p>
+              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs ${
+                offerBarEnabled ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" : "bg-destructive/15 text-destructive border border-destructive/30"
+              }`}>
+                {offerBarEnabled ? "Currently Visible" : "Completely Disabled"}
+              </span>
+            </div>
+            <p className="text-[11px] text-foreground/60 mt-0.5">
+              {offerBarEnabled 
+                ? "The top promotional ticker rotates active coupons on the customer website." 
+                : "The top offer banner is hidden from customers across the entire store."}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleToggleOfferBar}
+          disabled={togglingBanner}
+          className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0 ${
+            offerBarEnabled 
+              ? "bg-secondary text-foreground hover:bg-destructive hover:text-white" 
+              : "bg-accent text-slate-950 hover:bg-accent/90"
+          }`}
+        >
+          {offerBarEnabled ? "Disable Offer Bar" : "Enable Offer Bar"}
+        </button>
       </div>
 
       {/* KPI Strip */}

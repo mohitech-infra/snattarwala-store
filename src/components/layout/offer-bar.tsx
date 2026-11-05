@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Sparkles, Copy, Check, ChevronRight, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getOfferBarStatus } from "@/lib/store-settings-service"
 import Link from "next/link"
 
 interface CouponOffer {
@@ -13,6 +14,7 @@ interface CouponOffer {
 }
 
 export function OfferBar() {
+  const [isEnabled, setIsEnabled] = useState(true)
   const [offers, setOffers] = useState<CouponOffer[]>([
     {
       code: "WELCOME10",
@@ -26,6 +28,19 @@ export function OfferBar() {
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
+    // Check if Offer Bar is enabled by store settings
+    getOfferBarStatus().then(setIsEnabled)
+
+    const handleToggleEvent = (e: any) => {
+      if (e?.detail?.show !== undefined) {
+        setIsEnabled(Boolean(e.detail.show))
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("sn:offer-bar-toggle", handleToggleEvent)
+    }
+
     const fetchActiveCoupons = async () => {
       try {
         const supabase = createClient()
@@ -49,6 +64,12 @@ export function OfferBar() {
     }
 
     fetchActiveCoupons()
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("sn:offer-bar-toggle", handleToggleEvent)
+      }
+    }
   }, [])
 
   // Rotate through offers if more than one
@@ -60,7 +81,7 @@ export function OfferBar() {
     return () => clearInterval(interval)
   }, [offers.length])
 
-  if (dismissed || offers.length === 0) return null
+  if (!isEnabled || dismissed || offers.length === 0) return null
 
   const currentOffer = offers[currentIndex]
   const discountText = currentOffer.discountType === "percentage"

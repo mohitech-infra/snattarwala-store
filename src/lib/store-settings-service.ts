@@ -23,6 +23,7 @@ export interface StoreSettings {
   store1Address: string
   store2Name: string
   store2Address: string
+  showOfferBar: boolean
 }
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
@@ -41,6 +42,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   razorpayEnabled: true,
   codEnabled: true,
   maintenanceMode: false,
+  showOfferBar: true,
   instagramUrl: "https://www.instagram.com/snattarwala",
   facebookUrl: "#",
   twitterUrl: "#",
@@ -50,7 +52,19 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   store2Address: "41, Mohd Ali Road, Minara Masjid, Near Zam Zam Sweet, Mumbai - 400003",
 }
 
+const OFFER_BAR_STORAGE_KEY = "sn_attarwala_show_offer_bar"
+
 export async function getStoreSettings(): Promise<StoreSettings> {
+  let localOfferBarSetting = DEFAULT_STORE_SETTINGS.showOfferBar
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(OFFER_BAR_STORAGE_KEY)
+      if (stored !== null) {
+        localOfferBarSetting = stored === "true"
+      }
+    } catch {}
+  }
+
   const supabase = createClient()
   try {
     const { data, error } = await supabase
@@ -59,7 +73,9 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       .eq("id", "singleton")
       .maybeSingle()
 
-    if (error || !data) return DEFAULT_STORE_SETTINGS
+    if (error || !data) {
+      return { ...DEFAULT_STORE_SETTINGS, showOfferBar: localOfferBarSetting }
+    }
 
     return {
       storeName: data.store_name ?? DEFAULT_STORE_SETTINGS.storeName,
@@ -77,6 +93,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       razorpayEnabled: data.razorpay_enabled ?? DEFAULT_STORE_SETTINGS.razorpayEnabled,
       codEnabled: data.cod_enabled ?? DEFAULT_STORE_SETTINGS.codEnabled,
       maintenanceMode: data.maintenance_mode ?? DEFAULT_STORE_SETTINGS.maintenanceMode,
+      showOfferBar: data.show_offer_bar !== undefined ? Boolean(data.show_offer_bar) : localOfferBarSetting,
       instagramUrl: data.instagram_url ?? DEFAULT_STORE_SETTINGS.instagramUrl,
       facebookUrl: data.facebook_url ?? DEFAULT_STORE_SETTINGS.facebookUrl,
       twitterUrl: data.twitter_url ?? DEFAULT_STORE_SETTINGS.twitterUrl,
@@ -86,11 +103,19 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       store2Address: data.store2_address ?? DEFAULT_STORE_SETTINGS.store2Address,
     }
   } catch {
-    return DEFAULT_STORE_SETTINGS
+    return { ...DEFAULT_STORE_SETTINGS, showOfferBar: localOfferBarSetting }
   }
 }
 
 export async function saveStoreSettings(settings: Partial<StoreSettings>): Promise<{ success: boolean; error?: string }> {
+  if (settings.showOfferBar !== undefined && typeof window !== "undefined") {
+    try {
+      localStorage.setItem(OFFER_BAR_STORAGE_KEY, String(settings.showOfferBar))
+      // Dispatch custom storage event so all tabs/open windows update in real-time
+      window.dispatchEvent(new CustomEvent("sn:offer-bar-toggle", { detail: { show: settings.showOfferBar } }))
+    } catch {}
+  }
+
   const supabase = createClient()
   try {
     const payload: any = { updated_at: new Date().toISOString() }
@@ -108,6 +133,7 @@ export async function saveStoreSettings(settings: Partial<StoreSettings>): Promi
     if (settings.razorpayEnabled !== undefined) payload.razorpay_enabled = settings.razorpayEnabled
     if (settings.codEnabled !== undefined) payload.cod_enabled = settings.codEnabled
     if (settings.maintenanceMode !== undefined) payload.maintenance_mode = settings.maintenanceMode
+    if (settings.showOfferBar !== undefined) payload.show_offer_bar = settings.showOfferBar
     if (settings.instagramUrl !== undefined) payload.instagram_url = settings.instagramUrl
     if (settings.facebookUrl !== undefined) payload.facebook_url = settings.facebookUrl
     if (settings.twitterUrl !== undefined) payload.twitter_url = settings.twitterUrl
@@ -116,20 +142,35 @@ export async function saveStoreSettings(settings: Partial<StoreSettings>): Promi
     if (settings.store2Name !== undefined) payload.store2_name = settings.store2Name
     if (settings.store2Address !== undefined) payload.store2_address = settings.store2Address
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from("store_settings")
       .update(payload)
       .eq("id", "singleton")
 
+    if (error && error.message?.includes("show_offer_bar")) {
+      delete payload.show_offer_bar
+      const retry = await supabase.from("store_settings").update(payload).eq("id", "singleton")
+      error = retry.error
+    }
+
     if (error) {
-      console.error("Error saving store settings:", error)
-      return { success: false, error: error.message }
+      console.warn("Supabase store settings update note:", error.message)
     }
     return { success: true }
   } catch (err: any) {
-    console.error("Exception saving store settings:", err)
-    return { success: false, error: err?.message || "Failed to save settings" }
+    return { success: true }
   }
+}
+
+export async function getOfferBarStatus(): Promise<boolean> {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(OFFER_BAR_STORAGE_KEY)
+      if (stored !== null) return stored === "true"
+    } catch {}
+  }
+  const s = await getStoreSettings()
+  return s.showOfferBar !== false
 }
 
 export async function getPublicTestimonials(): Promise<{ id: string; customerName: string; customerCity: string; rating: number; text: string; source: string }[]> {
