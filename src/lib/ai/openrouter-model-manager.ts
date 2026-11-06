@@ -2,8 +2,10 @@ import fs from "fs"
 import path from "path"
 import { createOpenAI } from "@ai-sdk/openai"
 
+export const DEFAULT_FREE_MODEL = "nvidia/nemotron-3.5-lightning:free"
+
 export const DEFAULT_PRIORITY_FREE_MODELS = [
-  "nvidia/nemotron-3.5-lightning:free",
+  DEFAULT_FREE_MODEL,
   "openrouter/free",
   "dots-studio/dots-3-note-preview:free",
   "recursive/flint-v1.0:free",
@@ -19,7 +21,7 @@ interface ModelCache {
 }
 
 // In-memory sticky cache to avoid disk reads on every single request
-let inMemoryModel: string | null = null
+let inMemoryModel: string = DEFAULT_FREE_MODEL
 let lastDiscoveredModels: string[] = []
 let lastDiscoveryTime = 0
 
@@ -36,7 +38,7 @@ function readCache(): ModelCache {
   }
 
   return {
-    currentModel: DEFAULT_PRIORITY_FREE_MODELS[0],
+    currentModel: DEFAULT_FREE_MODEL,
     lastSuccessAt: new Date().toISOString(),
     recentFailures: {}
   }
@@ -77,15 +79,34 @@ export function getOpenRouterClient() {
 
 /**
  * Returns the currently active working free model instantly (0ms latency overhead).
- * If the server just started, it reads from the persistent cache file.
+ * Always prioritizes and defaults to 'nvidia/nemotron-3.5-lightning:free' unless it
+ * is temporarily experiencing a cooldown due to an active failure.
  */
 export function getCurrentWorkingModel(): string {
-  if (inMemoryModel) {
+  const cache = readCache()
+  const defaultFailedAt = cache.recentFailures[DEFAULT_FREE_MODEL]
+
+  // If the default model experienced a temporary rate-limit or downtime,
+  // allow a 15-minute cooldown before automatically restoring it as the default.
+  if (defaultFailedAt) {
+    const elapsed = Date.now() - new Date(defaultFailedAt).getTime()
+    if (elapsed > 15 * 60 * 1000) {
+      delete cache.recentFailures[DEFAULT_FREE_MODEL]
+      cache.currentModel = DEFAULT_FREE_MODEL
+      writeCache(cache)
+      inMemoryModel = DEFAULT_FREE_MODEL
+      return DEFAULT_FREE_MODEL
+    }
+    inMemoryModel = cache.currentModel || DEFAULT_PRIORITY_FREE_MODELS[1]
     return inMemoryModel
   }
 
-  const cache = readCache()
-  inMemoryModel = cache.currentModel || DEFAULT_PRIORITY_FREE_MODELS[0]
+  // Under normal conditions, always lock in DEFAULT_FREE_MODEL
+  if (cache.currentModel !== DEFAULT_FREE_MODEL) {
+    cache.currentModel = DEFAULT_FREE_MODEL
+    writeCache(cache)
+  }
+  inMemoryModel = DEFAULT_FREE_MODEL
   return inMemoryModel
 }
 
@@ -220,3 +241,4 @@ export async function findAndSwitchToNextWorkingFreeModel(failedModel?: string):
   setWorkingModel(fallback)
   return fallback
 }
+
