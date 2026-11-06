@@ -39,7 +39,14 @@ export async function POST(req: Request) {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex")
 
-    if (generated_signature !== razorpay_signature) {
+    const isMatch =
+      generated_signature.length === razorpay_signature.length &&
+      crypto.timingSafeEqual(
+        Buffer.from(generated_signature, "utf-8"),
+        Buffer.from(razorpay_signature, "utf-8")
+      )
+
+    if (!isMatch) {
       console.error("Razorpay signature mismatch:", {
         received: razorpay_signature,
         generated: generated_signature,

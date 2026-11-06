@@ -58,7 +58,7 @@ export default function RootLayout({
         <link rel="preload" as="image" href="/hero-poster.webp" type="image/webp" fetchPriority="high" />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col font-sans">
-        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
         <SmoothScroll>
           <CartProvider>
             {children}

@@ -216,8 +216,21 @@ export default function CheckoutPage() {
         }
       }
       
-      // @ts-ignore - Razorpay is loaded via script tag in layout
-      if (typeof window !== "undefined" && (window as any).Razorpay) {
+      // Ensure Razorpay SDK is loaded
+      let isSdkReady = typeof window !== "undefined" && !!(window as any).Razorpay
+      if (!isSdkReady) {
+        const loaded = await new Promise<boolean>((resolve) => {
+          const script = document.createElement("script")
+          script.src = "https://checkout.razorpay.com/v1/checkout.js"
+          script.async = true
+          script.onload = () => resolve(true)
+          script.onerror = () => resolve(false)
+          document.body.appendChild(script)
+        })
+        isSdkReady = loaded && !!(window as any).Razorpay
+      }
+
+      if (isSdkReady) {
         // @ts-ignore
         const rzp1 = new (window as any).Razorpay(options)
         rzp1.on('payment.failed', function (errResp: any){
@@ -226,7 +239,7 @@ export default function CheckoutPage() {
         })
         rzp1.open()
       } else {
-        alert("Payment SDK is loading, please try again in a few seconds.")
+        alert("Payment SDK could not be loaded. Please check your internet connection and try again.")
         setIsProcessing(false)
       }
       } // End Razorpay Flow

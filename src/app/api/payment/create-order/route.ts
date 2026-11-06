@@ -3,7 +3,7 @@ import Razorpay from "razorpay"
 
 export async function POST(req: Request) {
   try {
-    const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
+    const key_id = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
     const key_secret = process.env.RAZORPAY_KEY_SECRET
 
     if (!key_id || !key_secret) {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     })
 
     const body = await req.json()
-    const { amount, items, shippingAddress } = body
+    const { amount, currency = "INR", receipt, items, shippingAddress } = body
 
     if (!amount || Number(amount) <= 0) {
       return NextResponse.json(
@@ -29,37 +29,55 @@ export async function POST(req: Request) {
     }
 
     // Razorpay accepts amount in paise (1 INR = 100 paise)
-    const amountInPaise = Math.round(Number(amount) * 100)
-    const receiptId = `rcpt_${Date.now()}`
+    // If already in paise (isPaise flag or amount >= 100 without items)
+    const amountInPaise = body.isPaise 
+      ? Math.round(Number(amount))
+      : Math.round(Number(amount) * 100)
 
-    const options = {
+    if (amountInPaise < 100) {
+      return NextResponse.json(
+        { error: "Minimum order amount is 100 paise (₹1.00)" },
+        { status: 400 }
+      )
+    }
+
+    const receiptId = receipt || `rcpt_${Date.now()}`
+
+    const options: any = {
       amount: amountInPaise,
-      currency: "INR",
+      currency: currency || "INR",
       receipt: receiptId,
-      notes: {
+    }
+
+    if (shippingAddress || items) {
+      options.notes = {
         customer_name: shippingAddress?.fullName || "Valued Customer",
         customer_email: shippingAddress?.email || "",
         customer_phone: shippingAddress?.phone || "",
         city: shippingAddress?.city || "Mumbai",
         items_count: items?.length ? String(items.length) : "1",
-      },
+      }
     }
 
     const order = await razorpay.orders.create(options)
 
     return NextResponse.json({
+      order_id: order.id,
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
+      receipt: order.receipt,
+      key_id: key_id,
       keyId: key_id,
     })
   } catch (error: any) {
     console.error("Error creating Razorpay order:", error)
+    const statusCode = error?.statusCode === 401 ? 401 : (error?.statusCode || 500)
     return NextResponse.json(
       { 
         error: error?.error?.description || error?.message || "Failed to create payment order" 
       },
-      { status: 500 }
+      { status: statusCode }
     )
   }
 }
