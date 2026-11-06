@@ -44,7 +44,37 @@ Keep your responses elegant, luxurious, courteous, and concise.`;
       gender: z.enum(['Men', 'Women', 'Unisex']).optional().describe('The target gender if specified.'),
     }),
     execute: async ({ query, category, gender }: { query: string, category?: 'Attars' | 'Perfumes' | 'Bakhoor', gender?: 'Men' | 'Women' | 'Unisex' }) => {
-      const allProducts = await getPublicProducts();
+      let allProducts = await getPublicProducts();
+      if (!allProducts || allProducts.length === 0) {
+        const { DUMMY_PRODUCTS } = await import('@/lib/products');
+        allProducts = DUMMY_PRODUCTS.map(p => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          shortDescription: p.shortDescription,
+          price: p.price,
+          compareAtPrice: p.compareAtPrice ?? null,
+          sku: p.sku || '',
+          category: p.category,
+          gender: p.gender || 'Unisex',
+          fragranceFamily: p.fragranceFamily || null,
+          fragranceNotes: p.fragranceNotes || [],
+          topNotes: p.topNotes || [],
+          middleNotes: p.middleNotes || [],
+          baseNotes: p.baseNotes || [],
+          longevity: p.longevity || '8-12 Hours',
+          sizes: p.sizes || ['6ml', '12ml'],
+          rating: p.rating || 4.8,
+          reviews: p.reviews || 45,
+          imageUrl: p.imageUrl || '/products/white-oudh-attar.jpg',
+          isFeatured: true,
+          isBestseller: true,
+          isNewArrival: false,
+          imageGallery: [p.imageUrl]
+        }));
+      }
+
       let results = allProducts;
       
       if (category) {
@@ -66,33 +96,40 @@ Keep your responses elegant, luxurious, courteous, and concise.`;
           (p.baseNotes && p.baseNotes.some(n => n.toLowerCase().includes(q)))
         );
       }
+
+      const formatProduct = (p: any) => ({
+        id: p.id,
+        name: p.name,
+        brand: "SN AttarWala",
+        category: p.category || "Attars",
+        price: Number(p.price),
+        compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
+        imageUrl: p.imageUrl || "/products/white-oudh-attar.jpg",
+        slug: p.slug,
+        description: p.description || p.shortDescription || "",
+        notes: {
+          top: p.topNotes || [],
+          middle: p.middleNotes || [],
+          base: p.baseNotes || []
+        },
+        fragranceFamily: p.fragranceFamily || null,
+        longevity: p.longevity || "8-12 Hours",
+        rating: p.rating || 4.8,
+        sizes: p.sizes && p.sizes.length > 0 ? p.sizes : (p.category === "Perfumes" ? ["50ml", "100ml"] : ["6ml", "12ml"])
+      });
       
       // If no direct results, return top products as fallback options
       if (results.length === 0) {
         return {
           success: false,
-          products: allProducts.slice(0, 3).map(p => ({
-            id: p.id,
-            name: p.name,
-            brand: "SN AttarWala",
-            price: p.price,
-            imageUrl: p.imageUrl,
-            slug: p.slug
-          }))
+          products: allProducts.slice(0, 6).map(formatProduct)
         };
       }
       
-      // Return up to 3 matches for the UI
+      // Return up to 6 matches for the UI
       return {
         success: true,
-        products: results.slice(0, 3).map(p => ({
-          id: p.id,
-          name: p.name,
-          brand: "SN AttarWala",
-          price: p.price,
-          imageUrl: p.imageUrl,
-          slug: p.slug
-        }))
+        products: results.slice(0, 6).map(formatProduct)
       };
     },
   });
