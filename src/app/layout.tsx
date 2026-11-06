@@ -50,13 +50,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${inter.variable} ${playfair.variable} h-full antialiased`}
     >
       <head>
         <link rel="preload" as="image" href="/logo.png" type="image/png" fetchPriority="high" />
         <link rel="preload" as="image" href="/hero-poster.webp" type="image/webp" fetchPriority="high" />
       </head>
-      <body className="min-h-full flex flex-col font-sans">
+      <body suppressHydrationWarning className="min-h-full flex flex-col font-sans">
         <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
         <SmoothScroll>
           <CartProvider>

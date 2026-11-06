@@ -20,6 +20,7 @@ const segmentConfig: Record<string, { color: string; icon?: string }> = {
 }
 
 export default function AdminCustomersPage() {
+  const [mounted, setMounted] = useState(false)
   const [customers, setCustomers] = useState<AdminCustomer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -27,6 +28,7 @@ export default function AdminCustomersPage() {
   const [selected, setSelected] = useState<AdminCustomer | null>(null)
 
   useEffect(() => {
+    setMounted(true)
     const load = async () => {
       setLoading(true)
       const data = await getAdminCustomers() as AdminCustomer[]
@@ -52,8 +54,32 @@ export default function AdminCustomersPage() {
   const totalRevenue = customers.reduce((s, c) => s + c.totalSpent, 0)
   const avgLtv = customers.length > 0 ? Math.round(totalRevenue / customers.length) : 0
 
+  if (!mounted) {
+    return (
+      <div className="space-y-6" suppressHydrationWarning>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-6">
+          <div>
+            <span className="text-xs uppercase tracking-widest font-semibold text-accent block mb-1">Customer Intelligence</span>
+            <h1 className="font-heading text-3xl font-bold text-foreground">Customer CRM</h1>
+            <p className="text-sm text-foreground/60">Manage relationships with your registered buyers.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-card p-5 rounded-lg border border-border/60 shadow-sm animate-pulse h-24" />
+          ))}
+        </div>
+
+        <div className="bg-card border border-border/50 rounded-lg shadow-sm p-12 text-center animate-pulse">
+          <p className="text-xs uppercase tracking-widest text-foreground/40 font-semibold">Loading Customer Intelligence...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-6">
@@ -126,17 +152,18 @@ export default function AdminCustomersPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-card p-4 rounded-lg border border-border/50 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div className="relative flex-1 w-full sm:max-w-sm">
+      <div suppressHydrationWarning className="bg-card p-4 rounded-lg border border-border/50 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div suppressHydrationWarning className="relative flex-1 w-full sm:max-w-sm">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search name, email, phone, city..."
+            suppressHydrationWarning
             className="w-full bg-background border border-border rounded-sm py-2 pl-9 pr-3 text-xs focus:outline-none focus:border-accent text-foreground"
           />
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div suppressHydrationWarning className="flex gap-1 flex-wrap">
           {(["All", "VIP", "High Value", "Returning", "New", "At Risk"] as Segment[]).map(s => (
             <button
               key={s}
