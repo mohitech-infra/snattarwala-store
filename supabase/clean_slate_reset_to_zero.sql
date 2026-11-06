@@ -8,30 +8,55 @@
 -- 4. Click "New Query", paste this entire script, and click "Run".
 -- ==============================================================================
 
-BEGIN;
+DO $$
+BEGIN
+  -- 1. Clear shopping carts & wishlists (only if the tables exist)
+  IF to_regclass('public.cart_items') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.cart_items';
+  END IF;
 
--- 1. Clear shopping carts, wishlists, and reviews (references products)
-DELETE FROM public.cart_items;
-DELETE FROM public.wishlists;
-DELETE FROM public.reviews;
+  IF to_regclass('public.wishlists') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.wishlists';
+  END IF;
 
--- 2. Clear test orders & order items (references products)
-DELETE FROM public.order_items;
-DELETE FROM public.orders;
+  IF to_regclass('public.wishlist_items') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.wishlist_items';
+  END IF;
 
--- 3. Clear product variants and product images (references products with FK)
-DELETE FROM public.product_images;
-DELETE FROM public.product_variants;
+  IF to_regclass('public.reviews') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.reviews';
+  END IF;
 
--- 4. Delete all products
-DELETE FROM public.products;
+  -- 2. Clear test orders & order items
+  IF to_regclass('public.order_items') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.order_items';
+  END IF;
 
--- 5. Clear test abandoned carts
-DELETE FROM public.abandoned_carts;
+  IF to_regclass('public.orders') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.orders';
+  END IF;
 
-COMMIT;
+  -- 3. Clear product variants and product images
+  IF to_regclass('public.product_variants') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.product_variants';
+  END IF;
 
--- 6. Verification Query: Confirms every table is at 0
+  IF to_regclass('public.product_images') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.product_images';
+  END IF;
+
+  -- 4. Delete all products
+  IF to_regclass('public.products') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.products';
+  END IF;
+
+  -- 5. Clear test abandoned carts
+  IF to_regclass('public.abandoned_carts') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.abandoned_carts';
+  END IF;
+END $$;
+
+-- 6. Verification: Confirms all core tables are at 0
 SELECT 'products' AS entity, count(*) AS count FROM public.products
 UNION ALL
 SELECT 'product_variants', count(*) FROM public.product_variants
@@ -41,4 +66,3 @@ UNION ALL
 SELECT 'orders', count(*) FROM public.orders
 UNION ALL
 SELECT 'order_items', count(*) FROM public.order_items;
-
