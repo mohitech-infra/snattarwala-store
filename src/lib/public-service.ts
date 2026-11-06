@@ -83,8 +83,13 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
       `)
       .eq("is_active", true)
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.warn("Error fetching public products from Supabase:", error)
       return mapDummyProducts()
+    }
+
+    if (!data || data.length === 0) {
+      return []
     }
 
     return data.map((p: any) => {

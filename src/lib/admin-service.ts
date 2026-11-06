@@ -162,22 +162,11 @@ export interface AdminAbandonedCart {
 }
 
 // -------------------------------------------------------------
-// Auto-seeder to ensure real DB has fragrance data if empty
+// Auto-seeder intentionally disabled to prevent recreating deleted products
 // -------------------------------------------------------------
-let hasAttemptedSeed = false
-
 export async function ensureDatabaseSeeded(): Promise<void> {
-  if (hasAttemptedSeed) return
-  hasAttemptedSeed = true
-  try {
-    const supabase = createClient()
-    const { count } = await supabase.from("products").select("id", { count: "exact", head: true })
-    if (count === 0) {
-      await seedCatalogProducts()
-    }
-  } catch (err) {
-    console.warn("ensureDatabaseSeeded check:", err)
-  }
+  // Respect deletions by admin: do not automatically re-seed if table is empty.
+  return
 }
 
 // -------------------------------------------------------------
@@ -501,8 +490,26 @@ export async function updateAdminProduct(id: string, updates: Partial<AdminProdu
 }
 
 export async function deleteAdminProduct(id: string): Promise<boolean> {
+  // 1. If in browser, invoke dedicated server API with admin service role
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/admin/products?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      })
+      const result = await res.json()
+      if (result && result.success) {
+        triggerAdminCountsSync()
+        return true
+      }
+    } catch (fetchErr) {
+      console.warn("API route DELETE /api/admin/products failed, falling back to direct client:", fetchErr)
+    }
+  }
+
+  // 2. Direct client fallback with associated image cleanup
   const supabase = createClient()
   try {
+    await supabase.from("product_images").delete().eq("product_id", id)
     const { error } = await supabase.from("products").delete().eq("id", id)
     if (!error) {
       triggerAdminCountsSync()

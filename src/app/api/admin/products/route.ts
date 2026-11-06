@@ -196,3 +196,33 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get("id")
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Product ID is required." }, { status: 400 })
+    }
+
+    const supabase = getSupabase()
+
+    // 1. Delete associated product_images first to satisfy FK constraints
+    await supabase.from("product_images").delete().eq("product_id", id)
+
+    // 2. Delete the product
+    const { error } = await supabase.from("products").delete().eq("id", id)
+
+    if (error) {
+      console.error("Supabase delete error in /api/admin/products:", error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    console.error("Exception in DELETE /api/admin/products:", err)
+    return NextResponse.json({ success: false, error: err?.message || "Internal server error" }, { status: 500 })
+  }
+}
+
+
