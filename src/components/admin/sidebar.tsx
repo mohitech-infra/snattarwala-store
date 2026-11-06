@@ -39,7 +39,7 @@ interface SidebarProps {
 
 import { createClient } from "@/lib/supabase/client"
 import { getAdminSidebarCounts } from "@/lib/admin-service"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 
 export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
   const pathname = usePathname()
@@ -64,29 +64,79 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
     wholesaleLeads: 0
   })
 
-  useEffect(() => {
-    const fetchRoleAndCounts = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-        if (profile) setUserRole(profile.role)
-      }
+  const isRefreshingRef = useRef(false)
 
-      // Fetch live sidebar counters
+  const refreshCounts = useCallback(async () => {
+    if (isRefreshingRef.current) return
+    isRefreshingRef.current = true
+    try {
+      const liveCounts = await getAdminSidebarCounts()
+      setCounts(liveCounts)
+    } catch (err) {
+      console.error("Failed to load sidebar counts", err)
+    } finally {
+      isRefreshingRef.current = false
+    }
+  }, [])
+
+  // Load user role once
+  useEffect(() => {
+    const fetchRole = async () => {
       try {
-        const liveCounts = await getAdminSidebarCounts()
-        setCounts(liveCounts)
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+          if (profile?.role) setUserRole(profile.role)
+        }
       } catch (err) {
-        console.error("Failed to load sidebar counts", err)
+        console.warn("Could not fetch user role for sidebar:", err)
       }
     }
-    fetchRoleAndCounts()
+    fetchRole()
   }, [])
+
+  // Multi-tier Live Synchronization:
+  // 1. Refreshes on route/page navigation
+  // 2. Listens to custom internal CRUD events ('sn:admin-counts-sync')
+  // 3. Refreshes when window/tab regains focus
+  // 4. Background heartbeat every 4 seconds
+  // 5. Supabase Realtime broadcast channel
+  useEffect(() => {
+    refreshCounts()
+
+    const handleSyncEvent = () => refreshCounts()
+    const handleFocus = () => refreshCounts()
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("sn:admin-counts-sync", handleSyncEvent)
+      window.addEventListener("focus", handleFocus)
+    }
+
+    const interval = setInterval(refreshCounts, 4000)
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel("admin-sidebar-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => refreshCounts())
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => refreshCounts())
+      .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, () => refreshCounts())
+      .on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, () => refreshCounts())
+      .subscribe()
+
+    return () => {
+      clearInterval(interval)
+      if (typeof window !== "undefined") {
+        window.removeEventListener("sn:admin-counts-sync", handleSyncEvent)
+        window.removeEventListener("focus", handleFocus)
+      }
+      supabase.removeChannel(channel)
+    }
+  }, [pathname, refreshCounts])
 
   const allNavSections = [
     {

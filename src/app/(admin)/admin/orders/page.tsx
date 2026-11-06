@@ -6,9 +6,9 @@ import {
   X, ChevronDown, Filter, Download,
   Clock, RefreshCw, AlertTriangle, ArrowRight,
   MapPin, Phone, Mail, MessageSquareShare, Sparkles,
-  Barcode, ExternalLink
+  Barcode, ExternalLink, Trash2
 } from "lucide-react"
-import { getAdminOrders, updateAdminOrderStatus, AdminOrder } from "@/lib/admin-service"
+import { getAdminOrders, updateAdminOrderStatus, deleteAdminOrder, AdminOrder } from "@/lib/admin-service"
 import { ExportMenu } from "@/components/admin/export-menu"
 import { 
   getDeliveryPartnerConfig, 
@@ -539,6 +539,24 @@ export default function AdminOrdersPage() {
                   Cancel Order
                 </button>
               )}
+
+              {/* Permanently Delete Order (e.g. Test Orders) */}
+              <button
+                onClick={async () => {
+                  if (!confirm(`Permanently delete order ${selectedOrder.orderNumber}? This cannot be undone.`)) return
+                  const ok = await deleteAdminOrder(selectedOrder.id)
+                  if (ok) {
+                    setOrders(prev => prev.filter(o => o.id !== selectedOrder.id))
+                    setSelectedOrder(null)
+                  } else {
+                    alert("Failed to delete order. Please try again.")
+                  }
+                }}
+                className="w-full py-1.5 text-destructive/50 hover:text-destructive font-medium text-[10px] uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 border-t border-border/30 pt-2"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete Order
+              </button>
             </div>
           </div>
         )}

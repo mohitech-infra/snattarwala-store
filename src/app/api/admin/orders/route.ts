@@ -102,3 +102,31 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: false, error: error.message || "Failed to update order" }, { status: 500 })
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const orderId = searchParams.get("orderId") || searchParams.get("id")
+
+    if (!orderId) {
+      return NextResponse.json({ success: false, error: "orderId is required" }, { status: 400 })
+    }
+
+    const adminSupabase = getAdminClient()
+
+    // 1. Delete associated order items first to satisfy foreign key constraints
+    await adminSupabase.from("order_items").delete().eq("order_id", orderId)
+
+    // 2. Delete the order
+    const { error } = await adminSupabase.from("orders").delete().eq("id", orderId)
+    if (error) {
+      console.error("Supabase delete error in /api/admin/orders:", error)
+      throw error
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error("Error deleting order:", error)
+    return NextResponse.json({ success: false, error: error.message || "Failed to delete order" }, { status: 500 })
+  }
+}

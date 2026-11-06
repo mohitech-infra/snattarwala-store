@@ -1,5 +1,11 @@
 import { createClient } from "@/lib/supabase/client"
 
+export function triggerAdminCountsSync() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("sn:admin-counts-sync"))
+  }
+}
+
 export interface AdminProduct {
   id: string
   name: string
@@ -392,6 +398,7 @@ export async function createAdminProduct(productData: Partial<AdminProduct>): Pr
       })
     }
 
+    triggerAdminCountsSync()
     return { success: true, data: newProd }
   } catch (err: any) {
     console.error("Error creating product:", err)
@@ -410,6 +417,7 @@ export async function updateAdminProduct(id: string, updates: Partial<AdminProdu
       })
       const result = await res.json()
       if (result && result.success) {
+        triggerAdminCountsSync()
         return true
       }
     } catch (fetchErr) {
@@ -484,6 +492,7 @@ export async function updateAdminProduct(id: string, updates: Partial<AdminProdu
       }
     }
 
+    triggerAdminCountsSync()
     return true
   } catch (err) {
     console.error("Exception in updateAdminProduct:", err)
@@ -495,7 +504,11 @@ export async function deleteAdminProduct(id: string): Promise<boolean> {
   const supabase = createClient()
   try {
     const { error } = await supabase.from("products").delete().eq("id", id)
-    return !error
+    if (!error) {
+      triggerAdminCountsSync()
+      return true
+    }
+    return false
   } catch {
     return false
   }
@@ -692,9 +705,30 @@ export async function updateAdminOrderStatus(
       }),
     })
     const result = await res.json()
-    return result?.success === true
+    if (result?.success === true) {
+      triggerAdminCountsSync()
+      return true
+    }
+    return false
   } catch (err) {
     console.error("Error updating order status:", err)
+    return false
+  }
+}
+
+export async function deleteAdminOrder(orderId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/admin/orders?orderId=${encodeURIComponent(orderId)}`, {
+      method: "DELETE",
+    })
+    const result = await res.json()
+    if (result?.success === true) {
+      triggerAdminCountsSync()
+      return true
+    }
+    return false
+  } catch (err) {
+    console.error("Error deleting order:", err)
     return false
   }
 }
@@ -1436,18 +1470,37 @@ export async function updateCampaignStatus(id: string, status: AdminCampaign["st
 // Live Sidebar Dynamic Badges Counter
 // -------------------------------------------------------------
 export async function getAdminSidebarCounts() {
+  // 1. First priority: High-speed server API route
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/admin/counts", { 
+        cache: "no-store",
+        headers: { "Pragma": "no-cache" }
+      })
+      if (res.ok) {
+        const json = await res.json()
+        if (json?.success && json.counts) {
+          return json.counts
+        }
+      }
+    } catch (apiErr) {
+      console.warn("API route /api/admin/counts failed, falling back to direct client query:", apiErr)
+    }
+  }
+
+  // 2. Direct client query fallback using resilient Promise.allSettled
   const supabase = createClient()
   try {
     const [
-      { count: productsCount },
-      { count: lowStockCount },
-      { count: pendingOrdersCount },
-      { count: abandonedCartsCount },
-      { count: customersCount },
-      { count: pendingReviewsCount },
-      { count: activeCouponsCount },
-      { count: wholesaleLeadsCount }
-    ] = await Promise.all([
+      pRes,
+      lsRes,
+      oRes,
+      acRes,
+      cRes,
+      rRes,
+      cpRes,
+      wlRes
+    ] = await Promise.allSettled([
       supabase.from("products").select("*", { count: "exact", head: true }),
       supabase.from("products").select("*", { count: "exact", head: true }).lte("stock_quantity", 5),
       supabase.from("orders").select("*", { count: "exact", head: true }).or("status.ilike.%pending%,status.ilike.%new%"),
@@ -1455,18 +1508,25 @@ export async function getAdminSidebarCounts() {
       supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
       supabase.from("reviews").select("*", { count: "exact", head: true }).eq("is_approved", false),
       supabase.from("coupons").select("*", { count: "exact", head: true }).eq("is_active", true),
-      supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("category", "Wholesale").ilike("status", "%open%")
+      supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("category", "Wholesale").not("status", "ilike", "%closed%")
     ])
 
+    const getVal = (res: PromiseSettledResult<any>) => {
+      if (res.status === "fulfilled" && !res.value.error && typeof res.value.count === "number") {
+        return res.value.count
+      }
+      return 0
+    }
+
     return {
-      products: productsCount ?? 0,
-      lowStock: lowStockCount ?? 0,
-      pendingOrders: pendingOrdersCount ?? 0,
-      abandonedCarts: abandonedCartsCount ?? 0,
-      customers: customersCount ?? 0,
-      pendingReviews: pendingReviewsCount ?? 0,
-      activeCoupons: activeCouponsCount ?? 0,
-      wholesaleLeads: wholesaleLeadsCount ?? 0
+      products: getVal(pRes),
+      lowStock: getVal(lsRes),
+      pendingOrders: getVal(oRes),
+      abandonedCarts: getVal(acRes),
+      customers: getVal(cRes),
+      pendingReviews: getVal(rRes),
+      activeCoupons: getVal(cpRes),
+      wholesaleLeads: getVal(wlRes)
     }
   } catch {
     return {
