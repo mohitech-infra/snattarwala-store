@@ -927,14 +927,28 @@ export async function getAdminCategories(): Promise<AdminCategory[]> {
   }
 }
 
-export async function createAdminCategory(category: { name: string; slug: string; description: string; imageUrl?: string }): Promise<boolean> {
+export async function createAdminCategory(category: { name: string; slug?: string; description?: string; imageUrl?: string }): Promise<boolean> {
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(category),
+      })
+      const result = await res.json()
+      if (result && result.success) return true
+    } catch (apiErr) {
+      console.warn("API route POST /api/admin/categories failed, falling back:", apiErr)
+    }
+  }
+
   const supabase = createClient()
   try {
     const { error } = await supabase.from("categories").insert({
       name: category.name,
       slug: category.slug || category.name.toLowerCase().replace(/\s+/g, "-"),
-      description: category.description,
-      image_url: category.imageUrl || "/products/white-oudh-attar.jpg"
+      description: category.description || "",
+      image_url: category.imageUrl || `/categories/${category.slug || "attars"}.jpg`
     })
     return !error
   } catch {
@@ -942,13 +956,57 @@ export async function createAdminCategory(category: { name: string; slug: string
   }
 }
 
-export async function deleteAdminCategory(id: string): Promise<boolean> {
+export async function updateAdminCategory(id: string, updates: { name?: string; slug?: string; description?: string; imageUrl?: string; isActive?: boolean }): Promise<boolean> {
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...updates }),
+      })
+      const result = await res.json()
+      if (result && result.success) return true
+    } catch (apiErr) {
+      console.warn("API route PATCH /api/admin/categories failed, falling back:", apiErr)
+    }
+  }
+
   const supabase = createClient()
   try {
-    const { error } = await supabase.from("categories").delete().eq("id", id)
+    const payload: any = {}
+    if (updates.name !== undefined) payload.name = updates.name
+    if (updates.slug !== undefined) payload.slug = updates.slug
+    if (updates.description !== undefined) payload.description = updates.description
+    if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl
+    if (updates.isActive !== undefined) payload.is_active = updates.isActive
+    const { error } = await supabase.from("categories").update(payload).eq("id", id)
     return !error
   } catch {
     return false
+  }
+}
+
+export async function deleteAdminCategory(id: string): Promise<{ success: boolean; error?: string }> {
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/admin/categories?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      })
+      const result = await res.json()
+      if (result?.success) return { success: true }
+      return { success: false, error: result?.error || "Failed to delete category" }
+    } catch (apiErr) {
+      console.warn("API route DELETE /api/admin/categories failed, falling back:", apiErr)
+    }
+  }
+
+  const supabase = createClient()
+  try {
+    const { error } = await supabase.from("categories").delete().eq("id", id)
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to delete category" }
   }
 }
 
