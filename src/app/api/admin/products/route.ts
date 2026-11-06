@@ -9,6 +9,37 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+export async function GET() {
+  try {
+    const supabase = getSupabase()
+    const { data: dbProducts, error } = await supabase
+      .from("products")
+      .select(`
+        id, name, slug, sku, price, compare_at_price, stock_quantity,
+        gender, fragrance_type, top_notes, middle_notes, base_notes,
+        rating, review_count, featured, best_seller, new_arrival, is_active,
+        image_url, description, short_description, tags,
+        category:categories(name),
+        images:product_images(image_url, is_primary)
+      `)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Supabase get products error:", error)
+      return NextResponse.json({ success: false, error: error.message, data: [], count: 0 }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, data: dbProducts || [], count: dbProducts?.length || 0 }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      }
+    })
+  } catch (err: any) {
+    console.error("Exception in GET /api/admin/products:", err)
+    return NextResponse.json({ success: false, error: err?.message || "Internal server error", data: [], count: 0 }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -200,17 +231,38 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
+    const all = searchParams.get("all") === "true" || id === "all"
+
+    const supabase = getSupabase()
+
+    if (all) {
+      // Cascading bulk cleanup for all products
+      try { await supabase.from("product_images").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
+      try { await supabase.from("order_items").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
+      try { await supabase.from("reviews").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
+      try { await supabase.from("wishlists").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
+
+      const { error } = await supabase.from("products").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+      if (error) {
+        console.error("Supabase bulk delete error in /api/admin/products:", error)
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, count: 0 })
+    }
 
     if (!id) {
       return NextResponse.json({ success: false, error: "Product ID is required." }, { status: 400 })
     }
 
-    const supabase = getSupabase()
+    // 1. Delete associated product_images to satisfy FK constraints
+    try { await supabase.from("product_images").delete().eq("product_id", id) } catch (_) {}
 
-    // 1. Delete associated product_images first to satisfy FK constraints
-    await supabase.from("product_images").delete().eq("product_id", id)
+    // 2. Unlink or clean related tables so FK constraints never block deletion
+    try { await supabase.from("reviews").delete().eq("product_id", id) } catch (_) {}
+    try { await supabase.from("wishlists").delete().eq("product_id", id) } catch (_) {}
+    try { await supabase.from("order_items").delete().eq("product_id", id) } catch (_) {}
 
-    // 2. Delete the product
+    // 3. Delete the product
     const { error } = await supabase.from("products").delete().eq("id", id)
 
     if (error) {

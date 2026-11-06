@@ -521,6 +521,30 @@ export async function deleteAdminProduct(id: string): Promise<boolean> {
   }
 }
 
+export async function clearAllAdminProducts(): Promise<boolean> {
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/admin/products?all=true", { method: "DELETE" })
+      const result = await res.json()
+      if (result && result.success) {
+        triggerAdminCountsSync()
+        return true
+      }
+    } catch (e) {
+      console.warn("API clear all products error:", e)
+    }
+  }
+  const supabase = createClient()
+  try {
+    await supabase.from("product_images").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+    await supabase.from("products").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+    triggerAdminCountsSync()
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function seedCatalogProducts(): Promise<{ success: boolean; count: number; error?: string }> {
   const supabase = createClient()
   try {

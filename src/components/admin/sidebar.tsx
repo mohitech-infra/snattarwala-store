@@ -153,7 +153,7 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
           name: "Products", 
           href: "/admin/products", 
           icon: Package, 
-          badge: counts.products > 0 ? String(counts.products) : undefined 
+          badge: String(counts.products ?? 0)
         },
         { name: "Categories", href: "/admin/categories", icon: FolderTree },
         { 

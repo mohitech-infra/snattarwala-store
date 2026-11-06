@@ -19,7 +19,7 @@ import {
   ChevronDown,
   RefreshCw
 } from "lucide-react"
-import { getAdminProducts, createAdminProduct, deleteAdminProduct, updateAdminProduct, seedCatalogProducts, AdminProduct } from "@/lib/admin-service"
+import { getAdminProducts, createAdminProduct, deleteAdminProduct, updateAdminProduct, clearAllAdminProducts, AdminProduct } from "@/lib/admin-service"
 import { ExportMenu } from "@/components/admin/export-menu"
 import { ProductImageDropzone } from "@/components/admin/product-image-dropzone"
 
@@ -168,6 +168,20 @@ export default function AdminProductsPage() {
     }
   }
 
+  const handleClearAll = async () => {
+    if (confirm("⚠️ Are you sure you want to delete ALL products from your store database? This action cannot be undone.")) {
+      setLoading(true)
+      const ok = await clearAllAdminProducts()
+      if (ok) {
+        setProducts([])
+        alert("✅ All products removed. Catalog count is now 0.")
+      } else {
+        alert("Could not clear products from database.")
+      }
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       
@@ -210,6 +224,16 @@ export default function AdminProductsPage() {
               p.status
             ])}
           />
+          {products.length > 0 && (
+            <button 
+              onClick={handleClearAll}
+              className="px-4 py-2.5 bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20 text-xs font-semibold uppercase tracking-wider rounded-sm transition-all flex items-center gap-2 shadow-sm"
+              title="Delete all products from store database"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear All Products</span>
+            </button>
+          )}
           <button 
             onClick={() => setIsAddModalOpen(true)}
             className="px-5 py-2.5 bg-accent text-slate-950 font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-accent/90 transition-all flex items-center gap-2 shadow-sm"
