@@ -58,7 +58,7 @@ export function Chatbot() {
                 <div>
                   <h3 className="font-heading font-semibold tracking-wide text-foreground">Fragrance Expert</h3>
                   <p className="text-[10px] text-accent flex items-center gap-1 uppercase tracking-wider font-semibold">
-                    <Sparkles className="w-3 h-3" /> Powered by Groq AI
+                    <Sparkles className="w-3 h-3" /> Live Luxury AI Sommelier
                   </p>
                 </div>
               </div>
