@@ -280,6 +280,7 @@ export async function DELETE(req: NextRequest) {
 
     if (all) {
       // Cascading bulk cleanup for all products
+      try { await supabase.from("product_variants").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
       try { await supabase.from("product_images").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
       try { await supabase.from("order_items").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
       try { await supabase.from("reviews").delete().neq("id", "00000000-0000-0000-0000-000000000000") } catch (_) {}
@@ -297,7 +298,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Product ID is required." }, { status: 400 })
     }
 
-    // 1. Delete associated product_images to satisfy FK constraints
+    // 1. Delete associated product_variants & product_images to satisfy FK constraints
+    try { await supabase.from("product_variants").delete().eq("product_id", id) } catch (_) {}
     try { await supabase.from("product_images").delete().eq("product_id", id) } catch (_) {}
 
     // 2. Unlink or clean related tables so FK constraints never block deletion

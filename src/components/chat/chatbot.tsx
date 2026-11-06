@@ -33,7 +33,6 @@ import { useChat, type Message } from "ai/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useCart } from "@/hooks/use-cart"
-import { DUMMY_PRODUCTS } from "@/lib/products"
 
 interface CuratedProduct {
   id: string
@@ -199,28 +198,9 @@ function ChatbotInner({ isAdmin }: { isAdmin: boolean }) {
       }
     }
 
-    // If no products returned yet by tools, offer signature brand masterworks
+    // If no products returned yet by tools
     if (list.length === 0) {
-      return DUMMY_PRODUCTS.slice(0, 6).map((p) => ({
-        id: p.id,
-        name: p.name,
-        brand: p.brand || "SN AttarWala",
-        category: p.category,
-        price: p.price,
-        compareAtPrice: p.compareAtPrice ?? null,
-        imageUrl: p.imageUrl,
-        slug: p.slug,
-        description: p.description,
-        notes: {
-          top: p.topNotes || [],
-          middle: p.middleNotes || [],
-          base: p.baseNotes || []
-        },
-        fragranceFamily: p.fragranceFamily || null,
-        longevity: p.longevity || "8-12 Hours",
-        rating: p.rating || 4.8,
-        sizes: p.sizes || ["6ml", "12ml"]
-      }))
+      return []
     }
 
     return list

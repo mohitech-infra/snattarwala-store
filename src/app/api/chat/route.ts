@@ -96,33 +96,11 @@ Your core mission:
     execute: async ({ query, category, gender }: { query: string, category?: 'Attars' | 'Perfumes' | 'Bakhoor', gender?: 'Men' | 'Women' | 'Unisex' }) => {
       let allProducts = await getPublicProducts();
       if (!allProducts || allProducts.length === 0) {
-        const { DUMMY_PRODUCTS } = await import('@/lib/products');
-        allProducts = DUMMY_PRODUCTS.map(p => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          description: p.description,
-          shortDescription: p.shortDescription,
-          price: p.price,
-          compareAtPrice: p.compareAtPrice ?? null,
-          sku: p.sku || '',
-          category: p.category,
-          gender: p.gender || 'Unisex',
-          fragranceFamily: p.fragranceFamily || null,
-          fragranceNotes: p.fragranceNotes || [],
-          topNotes: p.topNotes || [],
-          middleNotes: p.middleNotes || [],
-          baseNotes: p.baseNotes || [],
-          longevity: p.longevity || '8-12 Hours',
-          sizes: p.sizes || ['6ml', '12ml'],
-          rating: p.rating || 4.8,
-          reviews: p.reviews || 45,
-          imageUrl: p.imageUrl || '/products/white-oudh-attar.jpg',
-          isFeatured: true,
-          isBestseller: true,
-          isNewArrival: false,
-          imageGallery: [p.imageUrl]
-        }));
+        return {
+          count: 0,
+          products: [],
+          message: "No products are currently available in the catalog."
+        };
       }
 
       let results = allProducts;

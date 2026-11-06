@@ -1,5 +1,7 @@
 {
-  "currentModel": "nvidia/nemotron-3.5-lightning:free",
-  "lastSuccessAt": "2026-11-06T04:24:14.228Z",
-  "recentFailures": {}
+  "currentModel": "stealth/crouton-alpha",
+  "lastSuccessAt": "2026-11-06T05:21:11.829Z",
+  "recentFailures": {
+    "nvidia/nemotron-3.5-lightning:free": "2026-11-06T05:20:21.868Z"
+  }
 }

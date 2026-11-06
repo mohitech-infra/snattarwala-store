@@ -109,7 +109,7 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
 
     if (error) {
       console.warn("Error fetching public products from Supabase:", error)
-      return mapDummyProducts()
+      return []
     }
 
     if (!data || data.length === 0) {
@@ -182,6 +182,7 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
       }
     })
   } catch (err) {
-    return mapDummyProducts()
+    console.error("Exception fetching public products:", err)
+    return []
   }
 }
