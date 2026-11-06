@@ -1601,7 +1601,8 @@ export async function getAdminSidebarCounts() {
       lsRes,
       oRes,
       acRes,
-      cRes,
+      profRes,
+      ordCustRes,
       rRes,
       cpRes,
       wlRes
@@ -1610,7 +1611,8 @@ export async function getAdminSidebarCounts() {
       supabase.from("products").select("*", { count: "exact", head: true }).lte("stock_quantity", 5),
       supabase.from("orders").select("*", { count: "exact", head: true }).or("status.ilike.%pending%,status.ilike.%new%"),
       supabase.from("abandoned_carts").select("*", { count: "exact", head: true }),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
+      supabase.from("profiles").select("id"),
+      supabase.from("orders").select("user_id, customer_email, customer_phone"),
       supabase.from("reviews").select("*", { count: "exact", head: true }).eq("is_approved", false),
       supabase.from("coupons").select("*", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("category", "Wholesale").not("status", "ilike", "%closed%")
@@ -1623,12 +1625,26 @@ export async function getAdminSidebarCounts() {
       return 0
     }
 
+    // Aggregate unique customer count exactly matching Customers Module
+    const customerKeys = new Set<string>()
+    if (profRes.status === "fulfilled" && Array.isArray(profRes.value.data)) {
+      profRes.value.data.forEach((p: any) => {
+        if (p.id) customerKeys.add(p.id)
+      })
+    }
+    if (ordCustRes.status === "fulfilled" && Array.isArray(ordCustRes.value.data)) {
+      ordCustRes.value.data.forEach((o: any) => {
+        const key = o.user_id || o.customer_email || o.customer_phone
+        if (key) customerKeys.add(key)
+      })
+    }
+
     return {
       products: getVal(pRes),
       lowStock: getVal(lsRes),
       pendingOrders: getVal(oRes),
       abandonedCarts: getVal(acRes),
-      customers: getVal(cRes),
+      customers: customerKeys.size,
       pendingReviews: getVal(rRes),
       activeCoupons: getVal(cpRes),
       wholesaleLeads: getVal(wlRes)
