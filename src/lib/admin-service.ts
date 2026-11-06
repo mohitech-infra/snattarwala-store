@@ -16,7 +16,7 @@ export interface AdminProduct {
   fragranceFamily: string
   price: number
   costPrice: number
-  salePrice?: number | null
+  salePrice?: number
   stock: number
   reservedStock: number
   reorderLevel: number

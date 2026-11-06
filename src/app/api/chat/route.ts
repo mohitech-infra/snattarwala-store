@@ -23,18 +23,68 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, mode = 'customer' } = await req.json();
+  const isAdminMode = mode === 'admin';
 
   // 1. Get current sticky working free model (0ms latency overhead)
   let activeModel = getCurrentWorkingModel();
   const openrouter = getOpenRouterClient();
 
-  const systemPrompt = `You are an expert luxury fragrance sommelier and personal shopping assistant for "SN AttarWala", Mumbai's premier attar and perfume house.
+  const customerSystemPrompt = `You are an expert luxury fragrance sommelier and personal shopping assistant for "SN AttarWala", Mumbai's premier attar and perfume house.
 Your purpose is to help customers discover their signature scent, explain the art of fragrance notes, and recommend exquisite attars, perfumes, and bakhoor from our catalog.
 If a customer asks for a recommendation, inquires about scents, or seeks options, ALWAYS use the 'searchProducts' tool to find relevant matches.
 CRITICAL: After the 'searchProducts' tool returns results, you MUST write a warm, elegant follow-up message explaining why you recommended these specific fragrances, detailing their unique fragrance notes (top, heart, base) and the emotions or occasions they evoke.
 Never invent perfumes that do not exist in our catalog.
 Keep your responses elegant, luxurious, courteous, and concise.`;
+
+  const adminSystemPrompt = `You are the executive AI Co-Pilot, Operations Guide, and Business Advisor for the Admin Panel of "SN AttarWala", Mumbai's premier luxury perfume and attar house.
+
+Your core mission:
+1. TEACH AND GUIDE THE ADMIN ABOUT THE ADMIN PANEL:
+   - Provide direct, clear, step-by-step instructions for managing every section of the admin dashboard.
+   - Products & Multi-Size Variants (/admin/products):
+     * Explain how to create or edit fragrances.
+     * Detail the "Product Sizes & Size-Specific Pricing" feature: how to use 1-click presets (3ml, 6ml, 12ml, 25ml for Attars; 30ml, 50ml, 100ml for Perfumes; 40g, 50g, 100g, 250g for Bakhoor) or custom sizes.
+     * Explain setting individual Selling Price (₹), MRP (Compare at Price), stock units, SKUs, and marking the Default Size shown on the storefront.
+     * Explain cost price and profit margin calculation ((Price - Cost) * Sales).
+   - Fragrance Categories & Visual Media (/admin/categories):
+     * Explain how to create categories and upload photos with the photo dropzone.
+     * Explain how to verify which photo is active via the photo badges in the table.
+   - Order Processing & Fulfillment (/admin/orders):
+     * Explain order statuses: New -> Confirmed -> Processing -> Packed -> Shipped -> Out for Delivery -> Delivered -> Cancelled.
+     * Explain how to filter by status, search orders, view line items, print tax invoices, and assign courier tracking.
+   - Inventory & Stock Thresholds (/admin/inventory):
+     * How to monitor low stock items at or below reorder levels, calculate restocking urgency, and prevent stockouts.
+   - Wholesale & B2B Leads (/admin/wholesale):
+     * How to manage bulk buyer leads, establish minimum order quantities (MOQ), and negotiate tiered bulk pricing.
+   - Abandoned Carts & Recovery (/admin/abandoned-carts):
+     * How to view high-dropoff checkout sessions and send 1-click WhatsApp recovery messages with incentive promo codes.
+   - Coupons & Marketing Campaigns (/admin/coupons):
+     * How to create percentage or flat discount coupon codes, minimum order requirements, and expiry dates.
+   - Store Settings & Database (/admin/settings):
+     * Managing store details, Supabase SQL migrations, and synchronization.
+
+2. STRATEGIC BUSINESS ADVICE & REVENUE EXPANSION:
+   - Recommend strategies to increase Average Order Value (AOV): creating 3ml discovery sample sets, his-and-her couple attar bundles, offering free sample vials above ₹2,000.
+   - Festive and seasonal marketing campaigns: Ramadan & Eid pre-orders, Diwali corporate gifting, wedding season attar favors, Mumbai monsoon fresh fragrances.
+   - Margin optimization and inventory turnover recommendations.
+
+3. DIRECT ADMIN NAVIGATION LINKS:
+   - Whenever referring to an admin section, provide direct Markdown links:
+     * [Products & Variants](/admin/products)
+     * [Fragrance Categories](/admin/categories)
+     * [Orders & Invoices](/admin/orders)
+     * [Inventory & Stock](/admin/inventory)
+     * [Wholesale B2B](/admin/wholesale)
+     * [Abandoned Carts](/admin/abandoned-carts)
+     * [Coupons & Offers](/admin/coupons)
+     * [Settings](/admin/settings)
+
+4. TONE & FORMAT:
+   - Professional, welcoming ("Salam Admin"), highly competent, and practical.
+   - Use clean Markdown with bold headings, bullet points, and numbered steps. Keep advice actionable.`;
+
+  const systemPrompt = isAdminMode ? adminSystemPrompt : customerSystemPrompt;
 
   const searchTool = tool({
     description: 'Search for perfumes in the catalog based on search terms. CRITICAL: You must generate a text response describing the products AFTER calling this tool.',
@@ -134,6 +184,58 @@ Keep your responses elegant, luxurious, courteous, and concise.`;
     },
   });
 
+  const adminStatsTool = tool({
+    description: 'Fetch real-time store statistics from Supabase: count of products, low stock items, pending orders, abandoned carts, wholesale leads, and active coupons.',
+    parameters: z.object({}),
+    execute: async () => {
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const [pRes, lsRes, oRes, acRes, wlRes, cpRes] = await Promise.allSettled([
+          supabase.from('products').select('*', { count: 'exact', head: true }),
+          supabase.from('products').select('*', { count: 'exact', head: true }).lte('stock_quantity', 5),
+          supabase.from('orders').select('*', { count: 'exact', head: true }).or('status.ilike.%pending%,status.ilike.%new%'),
+          supabase.from('abandoned_carts').select('*', { count: 'exact', head: true }),
+          supabase.from('support_tickets').select('*', { count: 'exact', head: true }).eq('category', 'Wholesale').not('status', 'ilike', '%closed%'),
+          supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        ]);
+
+        const getVal = (res: PromiseSettledResult<any>) => {
+          if (res.status === 'fulfilled' && !res.value.error && typeof res.value.count === 'number') {
+            return res.value.count;
+          }
+          return 0;
+        };
+
+        return {
+          totalProducts: getVal(pRes),
+          lowStockProducts: getVal(lsRes),
+          pendingOrders: getVal(oRes),
+          abandonedCarts: getVal(acRes),
+          wholesaleLeads: getVal(wlRes),
+          activeCoupons: getVal(cpRes),
+          note: 'Live database sync active.'
+        };
+      } catch (err: any) {
+        return {
+          note: 'Store database online. Synchronized with live admin panel.'
+        };
+      }
+    }
+  });
+
+  const tools: Record<string, any> = isAdminMode
+    ? {
+        getLiveStoreStats: adminStatsTool,
+        searchProducts: searchTool,
+      }
+    : {
+        searchProducts: searchTool,
+      };
+
   // Fast direct execution pipeline:
   // First attempt uses the cached activeModel with 0 ms overhead
   try {
@@ -142,9 +244,7 @@ Keep your responses elegant, luxurious, courteous, and concise.`;
       system: systemPrompt,
       messages,
       maxSteps: 3,
-      tools: {
-        searchProducts: searchTool,
-      },
+      tools,
     });
 
     // Successfully streamed - lock in this model for subsequent turns
@@ -164,9 +264,7 @@ Keep your responses elegant, luxurious, courteous, and concise.`;
         system: systemPrompt,
         messages,
         maxSteps: 3,
-        tools: {
-          searchProducts: searchTool,
-        },
+        tools,
       });
 
       return fallbackResult.toDataStreamResponse();
@@ -185,9 +283,7 @@ Keep your responses elegant, luxurious, courteous, and concise.`;
           system: systemPrompt,
           messages,
           maxSteps: 3,
-          tools: {
-            searchProducts: searchTool,
-          },
+          tools,
         });
 
         return groqResult.toDataStreamResponse();

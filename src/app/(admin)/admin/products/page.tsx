@@ -437,7 +437,9 @@ export default function AdminProductsPage() {
     const variants = newProduct.variants && newProduct.variants.length > 0 ? newProduct.variants : []
     const defaultVar = variants.find(v => v.isDefault) || variants[0]
     const finalPrice = defaultVar ? defaultVar.price : (newProduct.price || 1500)
-    const finalSalePrice = defaultVar?.compareAtPrice !== undefined ? defaultVar.compareAtPrice : (newProduct.salePrice || null)
+    const finalSalePrice = (defaultVar?.compareAtPrice !== undefined && defaultVar?.compareAtPrice !== null)
+      ? defaultVar.compareAtPrice
+      : (newProduct.salePrice || undefined)
     const totalStock = variants.length > 0
       ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
       : (newProduct.stock || 20)
@@ -497,7 +499,9 @@ export default function AdminProductsPage() {
     const variants = editingProduct.variants && editingProduct.variants.length > 0 ? editingProduct.variants : []
     const defaultVar = variants.find(v => v.isDefault) || variants[0]
     const finalPrice = defaultVar ? defaultVar.price : (editingProduct.price || 1500)
-    const finalSalePrice = defaultVar?.compareAtPrice !== undefined ? defaultVar.compareAtPrice : (editingProduct.salePrice || null)
+    const finalSalePrice = (defaultVar?.compareAtPrice !== undefined && defaultVar?.compareAtPrice !== null)
+      ? defaultVar.compareAtPrice
+      : (editingProduct.salePrice || undefined)
     const totalStock = variants.length > 0
       ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
       : (editingProduct.stock || 20)
@@ -805,28 +809,7 @@ export default function AdminProductsPage() {
                       {/* Price & Margin */}
                       <td className="px-5 py-4">
                         <p className="font-bold text-sm text-foreground">₹{product.price.toLocaleString('en-IN')}</p>
-                        {product.variants && product.variants.length > 0 ? (
-                          <div className="flex flex-wrap gap-1 mt-1 max-w-[220px]">
-                            {product.variants.map((v, i) => (
-                              <span
-                                key={i}
-                                className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                                  v.isDefault
-                                    ? "bg-accent/20 text-accent font-semibold border border-accent/40"
-                                    : "bg-secondary text-foreground/75 border border-border"
-                                }`}
-                                title={v.sku ? `SKU: ${v.sku} | Stock: ${v.stock ?? 0}` : undefined}
-                              >
-                                {v.size}: ₹{v.price.toLocaleString('en-IN')}
-                              </span>
-                            ))}
-                          </div>
-                        ) : product.size ? (
-                          <span className="text-[10px] text-foreground/60 block mt-0.5 font-medium">
-                            Size: {product.size}
-                          </span>
-                        ) : null}
-                        <p className="text-[10px] text-foreground/50 mt-1">Cost: ₹{product.costPrice} ({profitMargin}% margin)</p>
+                        <p className="text-[10px] text-foreground/50">Cost: ₹{product.costPrice} ({profitMargin}% margin)</p>
                       </td>
 
                       {/* Stock Level */}
@@ -1031,52 +1014,52 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* Product Sizes & Variant Pricing */}
+              {/* Pricing & Stock */}
               <div className="space-y-4">
                 <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">
-                  2. Product Sizes & Size-Specific Pricing
+                  2. Pricing & Inventory Control
                 </h4>
 
-                <ProductVariantsEditor
-                  category={newProduct.category || "Attars"}
-                  baseSku={newProduct.sku || "SNA"}
-                  basePrice={newProduct.price || 1500}
-                  variants={newProduct.variants}
-                  onChange={(vars) => {
-                    const defaultVar = vars.find(v => v.isDefault) || vars[0]
-                    const totalStock = vars.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
-                    setNewProduct({
-                      ...newProduct,
-                      variants: vars,
-                      price: defaultVar ? defaultVar.price : newProduct.price,
-                      salePrice: defaultVar?.compareAtPrice ?? newProduct.salePrice,
-                      stock: vars.length > 0 ? totalStock : newProduct.stock,
-                      size: vars.map(v => v.size).join(", ")
-                    })
-                  }}
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price per Bottle (₹)</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">MRP (Compare at) (₹)</label>
+                    <input
+                      type="number"
+                      value={newProduct.salePrice || ""}
+                      onChange={(e) => setNewProduct({...newProduct, salePrice: Number(e.target.value)})}
+                      className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Selling Price (₹) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={newProduct.price}
+                      onChange={(e) => setNewProduct({...newProduct, price: Number(e.target.value)})}
+                      className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price (₹)</label>
                     <input
                       type="number"
                       value={newProduct.costPrice}
                       onChange={(e) => setNewProduct({...newProduct, costPrice: Number(e.target.value)})}
-                      placeholder="e.g. 500"
                       className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
                     />
-                    <p className="text-[10px] text-foreground/50 mt-1">Used for admin profit margin analytics calculation.</p>
                   </div>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Low Stock Alert Threshold (Units)</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Initial Stock (Units)</label>
                     <input
                       type="number"
-                      value={newProduct.reorderLevel ?? 5}
-                      onChange={(e) => setNewProduct({...newProduct, reorderLevel: Number(e.target.value)})}
+                      value={newProduct.stock}
+                      onChange={(e) => setNewProduct({...newProduct, stock: Number(e.target.value)})}
                       className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
                     />
-                    <p className="text-[10px] text-foreground/50 mt-1">Alerts you when total inventory falls below this amount.</p>
                   </div>
                 </div>
               </div>
@@ -1283,44 +1266,31 @@ export default function AdminProductsPage() {
               </div>
 
               <div className="space-y-4">
-                <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">
-                  2. Product Sizes & Size-Specific Pricing
-                </h4>
-
-                <ProductVariantsEditor
-                  category={editingProduct.category || "Attars"}
-                  baseSku={editingProduct.sku || "SNA"}
-                  basePrice={editingProduct.price || 1500}
-                  variants={editingProduct.variants}
-                  onChange={(vars) => {
-                    const defaultVar = vars.find(v => v.isDefault) || vars[0]
-                    const totalStock = vars.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
-                    setEditingProduct({
-                      ...editingProduct,
-                      variants: vars,
-                      price: defaultVar ? defaultVar.price : editingProduct.price,
-                      salePrice: defaultVar?.compareAtPrice ?? editingProduct.salePrice,
-                      stock: vars.length > 0 ? totalStock : editingProduct.stock,
-                      size: vars.map(v => v.size).join(", ")
-                    })
-                  }}
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">2. Pricing & Inventory</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price per Bottle (₹)</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">MRP (Compare at) (₹)</label>
+                    <input type="number" value={editingProduct.salePrice || ""} onChange={(e) => setEditingProduct({...editingProduct, salePrice: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Selling Price (₹) *</label>
+                    <input required type="number" value={editingProduct.price || 0} onChange={(e) => setEditingProduct({...editingProduct, price: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price (₹)</label>
                     <input type="number" value={editingProduct.costPrice || 0} onChange={(e) => setEditingProduct({...editingProduct, costPrice: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
-                    <p className="text-[10px] text-foreground/50 mt-1">For profit analytics.</p>
                   </div>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Reorder Alert (Units)</label>
-                    <input type="number" value={editingProduct.reorderLevel ?? 5} onChange={(e) => setEditingProduct({...editingProduct, reorderLevel: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
-                    <p className="text-[10px] text-foreground/50 mt-1">Low-stock warning point.</p>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Stock (Units)</label>
+                    <input type="number" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({...editingProduct, stock: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
                   </div>
-                  <div className="flex items-center pt-4">
-                    <label className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-foreground cursor-pointer">
-                      <input type="checkbox" checked={editingProduct.is_active ?? (editingProduct.status === 'Active')} onChange={(e) => setEditingProduct({...editingProduct, is_active: e.target.checked, status: e.target.checked ? 'Active' : 'Draft'})} className="accent-accent w-4 h-4 rounded-sm border-border" />
-                      <span>Active in Store</span>
+                  <div className="flex items-end">
+                    <label className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-foreground mb-2">
+                      <input type="checkbox" checked={editingProduct.is_active || false} onChange={(e) => setEditingProduct({...editingProduct, is_active: e.target.checked})} className="accent-accent w-4 h-4 rounded-sm border-border" />
+                      <span>Active Product</span>
                     </label>
                   </div>
                 </div>

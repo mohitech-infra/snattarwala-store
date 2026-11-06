@@ -19,11 +19,19 @@ import {
   Flame,
   ArrowRight,
   Layers,
-  CheckCircle2
+  CheckCircle2,
+  Boxes,
+  AlertTriangle,
+  Truck,
+  DollarSign,
+  Lightbulb,
+  TrendingUp,
+  Users
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useChat, type Message } from "ai/react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useCart } from "@/hooks/use-cart"
 import { DUMMY_PRODUCTS } from "@/lib/products"
 
@@ -48,14 +56,91 @@ interface CuratedProduct {
   sizes?: string[]
 }
 
-const QUICK_PROMPTS = [
+const CUSTOMER_QUICK_PROMPTS = [
   "Show best Oudh attars for evening",
   "Recommend long-lasting luxury perfumes",
   "Show exotic Bakhoor incense for home",
-  "What is the best scent for a wedding gift?"
+  "What is the best scent for a wedding gift?",
+  "Taif Rose vs Cambodian Oud difference?",
+  "Do you offer Cash on Delivery (COD)?"
 ]
 
+const ADMIN_QUICK_PROMPTS = [
+  "How do I add size variants & prices?",
+  "How do I upload category photos?",
+  "Give me ideas to increase store revenue & AOV",
+  "How do I process pending orders & invoices?",
+  "How do I manage wholesale B2B inquiries?",
+  "What is my current store inventory & order status?"
+]
+
+function renderFormattedMessage(text: string) {
+  if (!text) return null
+  const lines = text.split("\n")
+
+  return (
+    <div className="space-y-1.5">
+      {lines.map((line, lineIdx) => {
+        if (!line.trim()) {
+          return <div key={lineIdx} className="h-1" />
+        }
+
+        const isBullet = line.trim().startsWith("• ") || line.trim().startsWith("- ") || line.trim().startsWith("* ")
+        const cleanLine = isBullet ? line.trim().replace(/^[•\-\*]\s*/, "") : line
+
+        const tokens = cleanLine.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g)
+
+        const renderedLine = tokens.map((token, tokIdx) => {
+          const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+          if (linkMatch) {
+            const [, title, url] = linkMatch
+            return (
+              <Link
+                key={tokIdx}
+                href={url}
+                className="inline-flex items-center gap-0.5 text-accent hover:underline font-semibold bg-accent/10 px-1 py-0.5 rounded transition-colors"
+              >
+                <span>{title}</span>
+                <ExternalLink className="w-2.5 h-2.5 ml-0.5 inline opacity-70" />
+              </Link>
+            )
+          }
+
+          const boldMatch = token.match(/^\*\*([^*]+)\*\*$/)
+          if (boldMatch) {
+            return (
+              <strong key={tokIdx} className="font-bold text-foreground">
+                {boldMatch[1]}
+              </strong>
+            )
+          }
+
+          return <span key={tokIdx}>{token}</span>
+        })
+
+        if (isBullet) {
+          return (
+            <div key={lineIdx} className="flex items-start gap-1.5 pl-1">
+              <span className="text-accent font-bold mt-0.5 shrink-0">•</span>
+              <div className="flex-1">{renderedLine}</div>
+            </div>
+          );
+        }
+
+        return <div key={lineIdx}>{renderedLine}</div>
+      })}
+    </div>
+  )
+}
+
 export function Chatbot() {
+  const pathname = usePathname()
+  const isAdmin = pathname?.startsWith("/admin") ?? false
+
+  return <ChatbotInner key={isAdmin ? "admin-mode" : "customer-mode"} isAdmin={isAdmin} />
+}
+
+function ChatbotInner({ isAdmin }: { isAdmin: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [mobileTab, setMobileTab] = useState<"chat" | "products">("chat")
@@ -70,15 +155,28 @@ export function Chatbot() {
 
   const { addItem, setIsCartOpen, cartCount, cartTotal } = useCart()
 
+  const customerInitialMessages: Message[] = [
+    {
+      id: "welcome-msg",
+      role: "assistant",
+      content: "Welcome to SN AttarWala! I am your personal AI fragrance expert and sommelier. Ask me anything about our pure attars, artisanal EDP perfumes, or exotic bakhoors, and I can curate a personalized boutique collection for you right on screen."
+    }
+  ]
+
+  const adminInitialMessages: Message[] = [
+    {
+      id: "admin-welcome-msg",
+      role: "assistant",
+      content: "Salam Admin! I am your **SN AttarWala Admin AI Co-Pilot & Business Advisor**.\n\nI can help you navigate and master the admin panel:\n• Adding fragrances with **multi-size variants & prices** (3ml, 6ml, 12ml)\n• Uploading and managing **category cover photos**\n• Processing **orders & printing tax invoices**\n• Managing **wholesale B2B inquiries** & tiered bulk pricing\n• Strategic tips for **increasing store revenue & AOV**\n\nWhat would you like to explore or do today?"
+    }
+  ]
+
   const { messages, input, setInput, handleInputChange, handleSubmit, isLoading } = useChat({
     api: "/api/chat",
-    initialMessages: [
-      {
-        id: "welcome-msg",
-        role: "assistant",
-        content: "Welcome to SN AttarWala! I am your personal AI fragrance expert and sommelier. Ask me anything about our pure attars, artisanal EDP perfumes, or exotic bakhoors, and I can curate a personalized boutique collection for you right on screen."
-      }
-    ]
+    body: {
+      mode: isAdmin ? "admin" : "customer"
+    },
+    initialMessages: isAdmin ? adminInitialMessages : customerInitialMessages
   })
 
   // Extract all recommended products across all messages
@@ -232,7 +330,7 @@ export function Chatbot() {
       >
         <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-slate-950 group-hover:rotate-12 transition-transform duration-300" />
         <span className="hidden sm:inline-block ml-2 text-xs font-bold tracking-wider uppercase text-slate-950 pr-1">
-          Ask Fragrance AI
+          {isAdmin ? "Admin AI Co-Pilot" : "Ask Fragrance AI"}
         </span>
       </button>
 
@@ -261,30 +359,41 @@ export function Chatbot() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-heading font-bold text-sm tracking-wide text-foreground">
-                      SN AttarWala AI
+                      {isAdmin ? "SN AttarWala Admin Co-Pilot" : "SN AttarWala AI"}
                     </h3>
                     <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-accent/15 text-accent border border-accent/30">
-                      <Sparkles className="w-2.5 h-2.5" /> Boutique Concierge
+                      <Sparkles className="w-2.5 h-2.5" /> {isAdmin ? "Operations Advisor" : "Boutique Concierge"}
                     </span>
                   </div>
                   <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Real-time Olfactory Sommelier</span>
+                    <span>{isAdmin ? "Live Store Intelligence & Guide" : "Real-time Olfactory Sommelier"}</span>
                   </p>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center space-x-2">
-                {/* Cart Preview Button */}
-                <button
-                  onClick={() => setIsCartOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-secondary hover:bg-accent/10 border border-border hover:border-accent/40 text-xs font-semibold transition-colors"
-                  title="View your shopping bag"
-                >
-                  <ShoppingBag className="w-3.5 h-3.5 text-accent" />
-                  <span className="font-bold text-foreground text-[11px]">{cartCount}</span>
-                </button>
+                {/* Cart Preview Button or Admin Orders Link */}
+                {isAdmin ? (
+                  <Link
+                    href="/admin/orders"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-secondary hover:bg-accent/15 border border-border hover:border-accent/40 text-xs font-semibold transition-colors"
+                    title="View Store Orders"
+                  >
+                    <Truck className="w-3.5 h-3.5 text-accent" />
+                    <span className="font-bold text-foreground text-[11px]">Orders</span>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => setIsCartOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-secondary hover:bg-accent/10 border border-border hover:border-accent/40 text-xs font-semibold transition-colors"
+                    title="View your shopping bag"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5 text-accent" />
+                    <span className="font-bold text-foreground text-[11px]">{cartCount}</span>
+                  </button>
+                )}
 
                 {/* Full-Screen Toggle */}
                 <button
@@ -293,7 +402,7 @@ export function Chatbot() {
                     if (!isFullScreen) setMobileTab("products")
                   }}
                   className="p-2 rounded-full hover:bg-secondary text-foreground/70 hover:text-foreground transition-colors border border-border/60"
-                  title={isFullScreen ? "Switch to Floating Chat" : "Takeover Fullscreen Shopping Experience"}
+                  title={isFullScreen ? "Switch to Floating Chat" : (isAdmin ? "Takeover Fullscreen Operations Hub" : "Takeover Fullscreen Shopping Experience")}
                   aria-label="Toggle Fullscreen"
                 >
                   {isFullScreen ? (
@@ -330,7 +439,7 @@ export function Chatbot() {
                   }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>AI Sommelier</span>
+                  <span>{isAdmin ? "AI Co-Pilot" : "AI Sommelier"}</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("products")}
@@ -340,10 +449,19 @@ export function Chatbot() {
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <ShoppingBag className="w-3.5 h-3.5" />
-                  <span>Boutique Products ({recommendedProducts.length})</span>
-                  {hasLiveRecommendations && (
-                    <span className="w-2 h-2 rounded-full bg-accent animate-ping" />
+                  {isAdmin ? (
+                    <>
+                      <Boxes className="w-3.5 h-3.5 text-accent" />
+                      <span>Operations Hub</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <span>Boutique Products ({recommendedProducts.length})</span>
+                      {hasLiveRecommendations && (
+                        <span className="w-2 h-2 rounded-full bg-accent animate-ping" />
+                      )}
+                    </>
                   )}
                 </button>
               </div>
@@ -367,7 +485,7 @@ export function Chatbot() {
                   className="px-4 py-2 border-b border-border/40 bg-secondary/20 overflow-x-auto custom-scrollbar flex gap-2 shrink-0 select-none"
                   data-lenis-prevent
                 >
-                  {QUICK_PROMPTS.map((p, idx) => (
+                  {(isAdmin ? ADMIN_QUICK_PROMPTS : CUSTOMER_QUICK_PROMPTS).map((p, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSelectPrompt(p)}
@@ -426,7 +544,7 @@ export function Chatbot() {
                                 : "bg-card border border-border/80 text-foreground rounded-2xl rounded-tl-xs shadow-sm"
                             }`}
                           >
-                            {msg.content}
+                            {renderFormattedMessage(msg.content)}
                           </div>
                         </div>
                       )}
@@ -511,7 +629,11 @@ export function Chatbot() {
                       <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center border border-border">
                         <Loader2 className="w-3 h-3 animate-spin text-accent" />
                       </div>
-                      <span className="italic font-medium">Sommelier is formulating advice & searching catalog...</span>
+                      <span className="italic font-medium">
+                        {isAdmin
+                          ? "Admin AI Co-Pilot is checking database & formulating advice..."
+                          : "Sommelier is formulating advice & searching catalog..."}
+                      </span>
                     </div>
                   )}
 
@@ -538,7 +660,11 @@ export function Chatbot() {
                       type="text"
                       value={input}
                       onChange={handleInputChange}
-                      placeholder="Ask for fragrances, notes, or occasion recommendations..."
+                      placeholder={
+                        isAdmin
+                          ? "Ask about admin panel features, pricing advice, order fulfillment..."
+                          : "Ask for fragrances, notes, or occasion recommendations..."
+                      }
                       className="w-full bg-background border border-border rounded-full pl-4 pr-12 py-2.5 text-xs md:text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent transition-all shadow-sm"
                       disabled={isLoading}
                     />
@@ -552,15 +678,304 @@ export function Chatbot() {
                     </button>
                   </form>
                   <p className="text-[10px] text-center text-muted-foreground mt-2">
-                    SN AttarWala AI Sommelier • Discover pure luxury & notes
+                    {isAdmin
+                      ? "SN AttarWala Admin AI Co-Pilot • Store Advisor & Management Guide"
+                      : "SN AttarWala AI Sommelier • Discover pure luxury & notes"}
                   </p>
                 </div>
               </div>
 
               {/* ============================================================== */}
-              {/* FULL-SCREEN SHOPPING BOUTIQUE SHOWCASE PANE                   */}
+              {/* FULL-SCREEN SHOWCASE PANE (Admin Hub vs Customer Boutique)     */}
               {/* ============================================================== */}
               {isFullScreen && (
+                isAdmin ? (
+                  <div
+                    className={`flex-1 flex flex-col h-full overflow-hidden bg-background ${
+                      mobileTab !== "products" ? "hidden md:flex" : "flex"
+                    }`}
+                  >
+                    {/* Admin Showcase Header */}
+                    <div className="px-5 py-4 border-b border-border/60 bg-card/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-accent" />
+                          <h2 className="font-heading font-bold text-base md:text-lg text-foreground tracking-wide">
+                            Admin Operations & Strategic Advisor
+                          </h2>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                            Live Co-Pilot Mode
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          1-Click direct navigation, panel guides, and proven strategies to grow SN AttarWala revenue.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Admin Content Body */}
+                    <div
+                      onWheel={(e) => e.stopPropagation()}
+                      onTouchMove={(e) => e.stopPropagation()}
+                      data-lenis-prevent
+                      className="flex-1 overflow-y-auto overscroll-contain p-5 custom-scrollbar space-y-6"
+                      style={{
+                        touchAction: "pan-y",
+                        WebkitOverflowScrolling: "touch"
+                      }}
+                    >
+                      {/* Section 1: Quick Navigation Cards */}
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-accent mb-3 flex items-center gap-2">
+                          <Boxes className="w-3.5 h-3.5" />
+                          <span>Admin Panel Direct Navigation & Guides</span>
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {/* Products & Sizes */}
+                          <div className="p-3.5 rounded-xl bg-card border border-border/70 hover:border-accent/50 transition-colors flex flex-col justify-between group">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <Boxes className="w-3.5 h-3.5 text-accent" />
+                                  Products & Sizes
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground/70">
+                                  /admin/products
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                List fragrances with 3ml, 6ml, 12ml sizes, individual variant prices, MRP compare-at values, and stock.
+                              </p>
+                            </div>
+                            <div className="pt-3 flex items-center justify-between">
+                              <Link
+                                href="/admin/products"
+                                className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>Open Products</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Link>
+                              <button
+                                onClick={() => handleSelectPrompt("How do I list a product with multiple sizes and size prices in /admin/products?")}
+                                className="text-[10px] text-muted-foreground hover:text-accent underline"
+                              >
+                                Ask Guide
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Fragrance Categories */}
+                          <div className="p-3.5 rounded-xl bg-card border border-border/70 hover:border-accent/50 transition-colors flex flex-col justify-between group">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <Layers className="w-3.5 h-3.5 text-accent" />
+                                  Categories & Photos
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground/70">
+                                  /admin/categories
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Upload cover photos for Attars, Perfumes, and Bakhoor. Inspect live photo badges and organize collections.
+                              </p>
+                            </div>
+                            <div className="pt-3 flex items-center justify-between">
+                              <Link
+                                href="/admin/categories"
+                                className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>Open Categories</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Link>
+                              <button
+                                onClick={() => handleSelectPrompt("How do I upload photos for categories in /admin/categories?")}
+                                className="text-[10px] text-muted-foreground hover:text-accent underline"
+                              >
+                                Ask Guide
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Orders & Invoices */}
+                          <div className="p-3.5 rounded-xl bg-card border border-border/70 hover:border-accent/50 transition-colors flex flex-col justify-between group">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <Truck className="w-3.5 h-3.5 text-accent" />
+                                  Orders & Invoices
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground/70">
+                                  /admin/orders
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Track orders across lifecycle (New, Confirmed, Shipped, Delivered), print tax invoices, and assign tracking numbers.
+                              </p>
+                            </div>
+                            <div className="pt-3 flex items-center justify-between">
+                              <Link
+                                href="/admin/orders"
+                                className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>Open Orders</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Link>
+                              <button
+                                onClick={() => handleSelectPrompt("How do I process pending orders and print tax invoices in /admin/orders?")}
+                                className="text-[10px] text-muted-foreground hover:text-accent underline"
+                              >
+                                Ask Guide
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Inventory Alerts */}
+                          <div className="p-3.5 rounded-xl bg-card border border-border/70 hover:border-accent/50 transition-colors flex flex-col justify-between group">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                  Inventory & Reorder
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground/70">
+                                  /admin/inventory
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Monitor stock depletion velocity, low-stock warnings at reorder thresholds, and warehouse replenishments.
+                              </p>
+                            </div>
+                            <div className="pt-3 flex items-center justify-between">
+                              <Link
+                                href="/admin/inventory"
+                                className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>Check Inventory</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Link>
+                              <button
+                                onClick={() => handleSelectPrompt("How do low-stock thresholds work and when should I reorder inventory?")}
+                                className="text-[10px] text-muted-foreground hover:text-accent underline"
+                              >
+                                Ask Guide
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Wholesale B2B */}
+                          <div className="p-3.5 rounded-xl bg-card border border-border/70 hover:border-accent/50 transition-colors flex flex-col justify-between group">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 text-accent" />
+                                  Wholesale B2B Leads
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground/70">
+                                  /admin/wholesale
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Manage bulk inquiries from Crawford Market and regional retailers, negotiate MOQs, and provide custom quotes.
+                              </p>
+                            </div>
+                            <div className="pt-3 flex items-center justify-between">
+                              <Link
+                                href="/admin/wholesale"
+                                className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>Review Leads</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Link>
+                              <button
+                                onClick={() => handleSelectPrompt("How should I manage wholesale B2B pricing tiers and minimum order quantities?")}
+                                className="text-[10px] text-muted-foreground hover:text-accent underline"
+                              >
+                                Ask Guide
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Abandoned Carts */}
+                          <div className="p-3.5 rounded-xl bg-card border border-border/70 hover:border-accent/50 transition-colors flex flex-col justify-between group">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <MessageSquare className="w-3.5 h-3.5 text-accent" />
+                                  Abandoned Carts
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground/70">
+                                  /admin/abandoned-carts
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                View dropped checkout carts and reach out directly with 1-click WhatsApp recovery messages and discount vouchers.
+                              </p>
+                            </div>
+                            <div className="pt-3 flex items-center justify-between">
+                              <Link
+                                href="/admin/abandoned-carts"
+                                className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>Recover Carts</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Link>
+                              <button
+                                onClick={() => handleSelectPrompt("What is the most effective WhatsApp strategy to recover abandoned carts?")}
+                                className="text-[10px] text-muted-foreground hover:text-accent underline"
+                              >
+                                Ask Guide
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 2: Proactive Strategic Advisory */}
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-accent mb-3 flex items-center gap-2">
+                          <Lightbulb className="w-3.5 h-3.5" />
+                          <span>Strategic Business Growth Advisory</span>
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                          <div className="p-4 rounded-xl bg-secondary/30 border border-border/70 space-y-2">
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-500 flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" /> Pricing Strategy
+                            </span>
+                            <h4 className="font-bold text-xs text-foreground">Multi-Size Tiering & Basket Expansion</h4>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              By offering 3ml entry bottles (₹500 - ₹800), customers can sample Taif Rose or White Oudh risk-free. Add a "Upgrade to 12ml for best value" prompt to turn samplers into full-bottle orders.
+                            </p>
+                            <button
+                              onClick={() => handleSelectPrompt("How can I structure multi-size pricing to maximize profit margins?")}
+                              className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1 pt-1"
+                            >
+                              <span>Explore pricing playbook</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          <div className="p-4 rounded-xl bg-secondary/30 border border-border/70 space-y-2">
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-accent flex items-center gap-1">
+                              <Flame className="w-3 h-3" /> Festive Campaigns
+                            </span>
+                            <h4 className="font-bold text-xs text-foreground">Ramadan, Eid & Wedding Season Pre-Orders</h4>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              Festive fragrance demand spikes 300%. Bundle 3 signature attars with a luxury velvet box at ₹2,999 (15% bundle discount) to push Average Order Value (AOV) higher.
+                            </p>
+                            <button
+                              onClick={() => handleSelectPrompt("Suggest an Eid and wedding season fragrance marketing strategy for SN AttarWala")}
+                              className="text-[11px] font-bold text-accent hover:underline inline-flex items-center gap-1 pt-1"
+                            >
+                              <span>Plan festive campaign</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                 <div
                   className={`flex-1 flex flex-col h-full overflow-hidden bg-background ${
                     mobileTab !== "products" ? "hidden md:flex" : "flex"
@@ -781,6 +1196,7 @@ export function Chatbot() {
                     )}
                   </div>
                 </div>
+                )
               )}
             </div>
           </motion.div>

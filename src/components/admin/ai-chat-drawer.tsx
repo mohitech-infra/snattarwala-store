@@ -60,17 +60,17 @@ export function AIChatDrawer({ isOpen, onClose }: AIChatDrawerProps) {
   }, [messages, isTyping])
 
   const quickPrompts = [
-    { label: "What should I focus on today?", icon: Flame },
-    { label: "Why did sales fall yesterday?", icon: TrendingUp },
-    { label: "Which products are low stock?", icon: Boxes },
+    { label: "How do I add size variants & prices?", icon: Boxes },
+    { label: "How do I upload category photos?", icon: Flame },
     { label: "How to increase average order value?", icon: DollarSign },
+    { label: "How to process pending orders & invoices?", icon: TrendingUp },
     { label: "Suggest an Eid festive promotion", icon: TicketPercent },
-    { label: "Analyze VIP customer behavior", icon: Users }
+    { label: "How do I manage wholesale B2B leads?", icon: Users }
   ]
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const query = textToSend || input
-    if (!query.trim()) return
+    if (!query.trim() || isTyping) return
 
     const userMsg: Message = {
       id: `usr-${Date.now()}`,
@@ -79,23 +79,85 @@ export function AIChatDrawer({ isOpen, onClose }: AIChatDrawerProps) {
       time: "Just now"
     }
 
-    setMessages(prev => [...prev, userMsg])
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
     setInput("")
     setIsTyping(true)
 
-    setTimeout(() => {
-      const response = getAIStoreResponse(query)
-      const aiMsg: Message = {
-        id: `ai-${Date.now()}`,
-        sender: "ai",
-        text: response.answer,
-        dataPoints: response.dataPoints,
-        suggestedAction: response.suggestedAction,
-        time: "Just now"
+    try {
+      const apiMessages = updatedMessages.map(m => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }))
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          mode: 'admin'
+        })
+      })
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      let accumulatedText = ""
+
+      const aiMsgId = `ai-${Date.now()}`
+      setMessages(prev => [
+        ...prev,
+        {
+          id: aiMsgId,
+          sender: "ai",
+          text: "",
+          time: "Just now"
+        }
+      ])
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n')
+          for (const line of lines) {
+            if (line.startsWith('0:')) {
+              try {
+                accumulatedText += JSON.parse(line.slice(2))
+              } catch {
+                accumulatedText += line.slice(2)
+              }
+            } else if (!line.startsWith('d:') && !line.startsWith('e:') && !line.startsWith('2:') && line.trim()) {
+              accumulatedText += line
+            }
+          }
+
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === aiMsgId ? { ...m, text: accumulatedText } : m
+            )
+          )
+        }
       }
-      setMessages(prev => [...prev, aiMsg])
+    } catch (err) {
+      console.warn("Live AI streaming failed, falling back to store response:", err)
+      const fallback = getAIStoreResponse(query)
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          sender: "ai",
+          text: fallback.answer,
+          dataPoints: fallback.dataPoints,
+          suggestedAction: fallback.suggestedAction,
+          time: "Just now"
+        }
+      ])
+    } finally {
       setIsTyping(false)
-    }, 600)
+    }
   }
 
   if (!isOpen) return null
@@ -178,7 +240,9 @@ export function AIChatDrawer({ isOpen, onClose }: AIChatDrawerProps) {
                   }`}
                 >
                   <div className="whitespace-pre-line" dangerouslySetInnerHTML={{ 
-                    __html: m.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                    __html: m.text
+                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="text-accent underline font-semibold hover:text-accent/80 transition-colors">$1 ↗</a>')
                   }} />
 
                   {/* Data Points Grid */}
