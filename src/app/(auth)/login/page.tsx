@@ -50,9 +50,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="py-24 bg-background min-h-[80vh] flex flex-col justify-center">
+    <div suppressHydrationWarning className="py-24 bg-background min-h-[80vh] flex flex-col justify-center">
       <Container>
-        <div className="max-w-md mx-auto w-full p-8 border border-border/50 rounded-lg bg-card shadow-sm">
+        <div suppressHydrationWarning className="max-w-md mx-auto w-full p-8 border border-border/50 rounded-lg bg-card shadow-sm">
           <div className="text-center mb-8">
             <h1 className="font-heading text-3xl font-bold">Welcome Back</h1>
             <p className="text-foreground/60 text-sm mt-2">Sign in to your SN Attarwala account</p>

@@ -20,14 +20,14 @@ export default function AdminRootLayout({
 
   if (pathname === '/admin/login') {
     return (
-      <div className="min-h-screen bg-background text-foreground selection:bg-accent selection:text-slate-950">
+      <div suppressHydrationWarning className="min-h-screen bg-background text-foreground selection:bg-accent selection:text-slate-950">
         {children}
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex bg-background text-foreground overflow-hidden selection:bg-accent selection:text-slate-950">
+    <div suppressHydrationWarning className="h-screen flex bg-background text-foreground overflow-hidden selection:bg-accent selection:text-slate-950">
       
       {/* Desktop Sidebar */}
       <div className="hidden lg:block shrink-0 h-full">

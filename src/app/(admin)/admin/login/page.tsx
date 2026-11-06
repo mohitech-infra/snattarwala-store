@@ -1,16 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 export default function AdminLoginPage() {
+  const [mounted, setMounted] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,11 +53,25 @@ export default function AdminLoginPage() {
     }
   }
 
+  if (!mounted) {
+    return (
+      <div suppressHydrationWarning className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div suppressHydrationWarning className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border border-slate-100 animate-pulse text-center">
+          <div suppressHydrationWarning className="w-16 h-16 bg-slate-900 text-white flex items-center justify-center rounded-xl mx-auto mb-4 text-2xl font-bold font-serif">
+            M
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
+          <p className="text-slate-500 text-sm mt-2">Loading authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border border-slate-100">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-slate-900 text-white flex items-center justify-center rounded-xl mx-auto mb-4 text-2xl font-bold font-serif">
+    <div suppressHydrationWarning className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div suppressHydrationWarning className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border border-slate-100">
+        <div suppressHydrationWarning className="text-center mb-8">
+          <div suppressHydrationWarning className="w-16 h-16 bg-slate-900 text-white flex items-center justify-center rounded-xl mx-auto mb-4 text-2xl font-bold font-serif">
             M
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
@@ -60,13 +79,13 @@ export default function AdminLoginPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 text-sm p-4 rounded-lg mb-6 border border-red-100 text-center">
+          <div suppressHydrationWarning className="bg-red-50 text-red-600 text-sm p-4 rounded-lg mb-6 border border-red-100 text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
+        <form onSubmit={handleLogin} className="space-y-5" suppressHydrationWarning>
+          <div suppressHydrationWarning>
             <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
             <input 
               type="email" 
@@ -74,11 +93,12 @@ export default function AdminLoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required 
               placeholder="admin@snattarwala.in"
+              suppressHydrationWarning
               className="w-full border border-slate-200 bg-slate-50/50 p-3 rounded-lg focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors" 
             />
           </div>
           
-          <div>
+          <div suppressHydrationWarning>
             <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
             <input 
               type="password" 
@@ -86,6 +106,7 @@ export default function AdminLoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required 
               placeholder="••••••••"
+              suppressHydrationWarning
               className="w-full border border-slate-200 bg-slate-50/50 p-3 rounded-lg focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors" 
             />
           </div>
@@ -99,7 +120,7 @@ export default function AdminLoginPage() {
           </button>
         </form>
         
-        <div className="mt-8 text-center">
+        <div suppressHydrationWarning className="mt-8 text-center">
           <a href="/" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">
             &larr; Back to Main Store
           </a>
