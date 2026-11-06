@@ -1,452 +1,121 @@
-"use client"
+import { Metadata } from "next"
+import { notFound } from "next/navigation"
+import { getPublicProducts } from "@/lib/public-service"
+import { getStorePolicies } from "@/lib/policies-service"
+import { generateProductStructuredData, getBaseSiteUrl } from "@/lib/google-shopping-service"
+import { ProductDetailView } from "@/components/product/product-detail-view"
 
-import { Container } from "@/components/layout/container"
-import { Heart, MessageCircle, Minus, Plus, Star, Truck, ShieldCheck, RefreshCw } from "lucide-react"
-import { useState } from "react"
-import { use } from "react"
-import { useCart } from "@/hooks/use-cart"
-import { FragranceNoteBadge } from "@/components/product/fragrance-note-badge"
-import { ProductCard } from "@/components/product/product-card"
-import { useEffect } from "react"
-import { getPublicProducts, PublicProduct } from "@/lib/public-service"
-import { getStorePolicies, DEFAULT_STORE_POLICIES, StorePolicies } from "@/lib/policies-service"
-import { notFound, useRouter } from "next/navigation"
+interface ProductPageProps {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
 
-export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
-  const router = useRouter()
-  const { slug } = use(params)
-  
-  const [product, setProduct] = useState<PublicProduct | null>(null)
-  const [relatedProducts, setRelatedProducts] = useState<PublicProduct[]>([])
-  const [loading, setLoading] = useState(true)
+export async function generateMetadata({ params, searchParams }: ProductPageProps): Promise<Metadata> {
+  const { slug } = await params
+  const search = await searchParams
+  const variantParam = typeof search.variant === "string" 
+    ? search.variant 
+    : Array.isArray(search.variant) 
+      ? search.variant[0] 
+      : undefined
 
-  const [quantity, setQuantity] = useState(1)
-  const [selectedSize, setSelectedSize] = useState("")
-  const [selectedImage, setSelectedImage] = useState("")
-  const [activeTab, setActiveTab] = useState("description")
-  const [policies, setPolicies] = useState<StorePolicies>(DEFAULT_STORE_POLICIES)
-  const { addItem, setIsCartOpen } = useCart()
+  const products = await getPublicProducts()
+  const product = products.find((p) => p.slug === slug)
 
-  useEffect(() => {
-    getStorePolicies().then(p => setPolicies(p))
-  }, [])
-
-  useEffect(() => {
-    getPublicProducts().then(allProducts => {
-      const found = allProducts.find(p => p.slug === slug)
-      if (found) {
-        setProduct(found)
-        const defaultVar = found.variants?.find(v => v.isDefault) || found.variants?.[0]
-        setSelectedSize(defaultVar ? defaultVar.size : (found.sizes[0] || ""))
-        setSelectedImage(found.imageUrl || "")
-        setRelatedProducts(allProducts.filter(p => p.category === found.category && p.id !== found.id).slice(0, 4))
-      }
-      setLoading(false)
-    })
-  }, [slug])
-
-  if (loading) {
-    return <div className="py-32 text-center text-xs uppercase tracking-widest font-medium">Loading Product...</div>
+  if (!product) {
+    return {
+      title: "Product Not Found | SN AttarWala",
+      description: "The requested fragrance was not found.",
+    }
   }
+
+  const baseUrl = getBaseSiteUrl()
+  const canonicalUrl = `${baseUrl}/product/${product.slug}`
+
+  // If a specific variant is selected, customize title
+  const activeVariant = product.variants?.find(
+    (v) => (v.sku && v.sku.toLowerCase() === variantParam?.toLowerCase()) ||
+           (v.size && v.size.toLowerCase() === variantParam?.toLowerCase())
+  )
+
+  const pageTitle = activeVariant
+    ? `${product.name} - ${activeVariant.size} | SN AttarWala`
+    : `${product.name} | Authentic Artisanal Attar & Luxury Perfume | SN AttarWala`
+
+  const rawDesc = product.shortDescription || product.description || `Shop ${product.name} by SN AttarWala.`
+  const metaDesc = rawDesc.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 155)
+
+  const imageUrl = product.imageUrl?.startsWith("http")
+    ? product.imageUrl
+    : `${baseUrl}${product.imageUrl?.startsWith("/") ? "" : "/"}${product.imageUrl || "/products/white-oudh-attar.jpg"}`
+
+  return {
+    title: pageTitle,
+    description: metaDesc,
+    alternates: {
+      canonical: canonicalUrl, // Google canonical rule: always point to parent URL
+    },
+    openGraph: {
+      title: pageTitle,
+      description: metaDesc,
+      url: variantParam ? `${canonicalUrl}?variant=${encodeURIComponent(variantParam)}` : canonicalUrl,
+      siteName: "SN AttarWala",
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 1200,
+          alt: `${product.name} - Luxury Fragrance bottle`,
+        },
+      ],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: pageTitle,
+      description: metaDesc,
+      images: [imageUrl],
+    },
+  }
+}
+
+export default async function ProductPage({ params, searchParams }: ProductPageProps) {
+  const { slug } = await params
+  const search = await searchParams
+  const variantParam = typeof search.variant === "string" 
+    ? search.variant 
+    : Array.isArray(search.variant) 
+      ? search.variant[0] 
+      : undefined
+
+  const allProducts = await getPublicProducts()
+  const product = allProducts.find((p) => p.slug === slug)
 
   if (!product) {
     notFound()
   }
 
-  // Active variant resolution for dynamic price and stock per size
-  const activeVariant = product.variants?.find(v => v.size === selectedSize)
-  const currentPrice = activeVariant ? activeVariant.price : product.price
-  const currentCompareAtPrice = activeVariant?.compareAtPrice !== undefined ? activeVariant.compareAtPrice : product.compareAtPrice
-  const discount = currentCompareAtPrice && currentCompareAtPrice > currentPrice 
-    ? Math.round(((currentCompareAtPrice - currentPrice) / currentCompareAtPrice) * 100) 
-    : 0
+  const relatedProducts = allProducts
+    .filter((p) => p.category === product.category && p.id !== product.id)
+    .slice(0, 4)
 
-  const inStock = activeVariant?.stock !== undefined ? activeVariant.stock > 0 : (product.inStock ?? true)
-
-  const handleBuyNow = () => {
-    if (inStock) {
-      addItem({
-        productId: product.id,
-        name: product.name,
-        price: currentPrice,
-        imageUrl: product.imageUrl || "/placeholder.jpg",
-        quantity,
-        size: selectedSize || product.sizes[0] || "Standard"
-      })
-      setIsCartOpen(false)
-      router.push("/checkout")
-    }
-  }
-
-  const gallery = product.imageGallery && product.imageGallery.length > 0 
-    ? product.imageGallery 
-    : [product.imageUrl]
+  const policies = await getStorePolicies()
+  const baseUrl = getBaseSiteUrl()
+  const structuredData = generateProductStructuredData(product, variantParam, baseUrl)
 
   return (
-    <div className="py-12 bg-background min-h-screen">
-      <Container>
-        {/* Breadcrumb */}
-        <nav className="text-xs uppercase tracking-widest text-foreground/50 mb-10 flex items-center space-x-2">
-          <a href="/" className="hover:text-accent transition-colors">Home</a>
-          <span>/</span>
-          <a href={`/shop?category=${product.category.toLowerCase()}`} className="hover:text-accent transition-colors">{product.category}</a>
-          <span>/</span>
-          <span className="text-foreground">{product.name}</span>
-        </nav>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-          {/* Visuals: Product Image */}
-          <div className="space-y-6">
-            <div className="aspect-[4/5] bg-secondary/30 rounded-xl overflow-hidden relative group border border-border/50">
-              {selectedImage || product.imageUrl ? (
-                <img 
-                  src={selectedImage || product.imageUrl} 
-                  alt={product.name}
-                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-foreground/20 font-medium tracking-widest uppercase">Product Image</span>
-                </div>
-              )}
-              
-              <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-                {product.isNewArrival && (
-                  <span className="bg-primary text-primary-foreground text-[10px] font-semibold px-3 py-1.5 rounded-sm tracking-wider uppercase shadow-sm">NEW</span>
-                )}
-                {discount > 0 && (
-                  <span className="bg-destructive text-destructive-foreground text-[10px] font-semibold px-3 py-1.5 rounded-sm tracking-wider uppercase shadow-sm">-{discount}%</span>
-                )}
-              </div>
-            </div>
-            
-            {/* Gallery Thumbnails */}
-            {gallery.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {gallery.map((img, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => setSelectedImage(img)}
-                    className={`aspect-square bg-secondary/30 rounded-md overflow-hidden cursor-pointer border transition-all relative ${selectedImage === img ? 'border-accent ring-2 ring-accent/30' : 'border-border/50 hover:border-accent'}`}
-                  >
-                    <img src={img} alt={`${product.name} view ${i + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Product Info */}
-          <div className="flex flex-col">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex items-center space-x-2">
-                <span className="text-[10px] font-medium text-accent uppercase tracking-wider">{product.category}</span>
-                {product.gender && (
-                  <>
-                    <span className="text-foreground/30">•</span>
-                    <span className="text-[10px] font-medium text-foreground/60 uppercase tracking-wider">{product.gender}</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <h1 className="font-heading text-4xl md:text-5xl font-bold mb-4 tracking-tight">{product.name}</h1>
-            
-            {product.isReplica && (
-              <p className="text-xs text-muted-foreground uppercase tracking-widest mb-4 inline-block border border-border px-2 py-1 rounded-sm">
-                Inspired Fragrance
-              </p>
-            )}
-
-            <div className="flex items-center space-x-4 mb-6">
-              <div className="flex items-center text-accent">
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current opacity-50" />
-              </div>
-              <span className="text-sm text-foreground/60 tracking-wide">{product.rating} ({product.reviews} reviews)</span>
-            </div>
-
-            <div className="flex items-baseline space-x-4 mb-6">
-              <span className="text-3xl font-semibold tracking-tight">₹{currentPrice.toLocaleString('en-IN')}</span>
-              {currentCompareAtPrice && currentCompareAtPrice > currentPrice && (
-                <>
-                  <span className="text-xl text-foreground/40 line-through tracking-tight">₹{currentCompareAtPrice.toLocaleString('en-IN')}</span>
-                  <span className="text-sm font-bold text-red-500 tracking-wider">({discount}% OFF)</span>
-                </>
-              )}
-            </div>
-
-            {/* Fragrance Notes Badges */}
-            {product.fragranceNotes && product.fragranceNotes.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-8">
-                {product.fragranceNotes.map((note, index) => (
-                  <FragranceNoteBadge key={index} note={note} className="px-3 py-1" />
-                ))}
-              </div>
-            )}
-
-            <div className="space-y-8 mb-10 flex-grow border-t border-b border-border/50 py-8">
-              {/* Size Selection with Dynamic Price Badges */}
-              {product.sizes && product.sizes.length > 0 && (
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-foreground/80">Select Fragrance Size</span>
-                    <span className="text-[11px] text-accent font-semibold">
-                      {activeVariant ? `Active: ${activeVariant.size} (₹${activeVariant.price.toLocaleString("en-IN")})` : `Selected: ${selectedSize}`}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {product.sizes.map((size) => {
-                      const v = product.variants?.find((varItem) => varItem.size === size)
-                      const isSelected = selectedSize === size
-
-                      return (
-                        <button 
-                          key={size}
-                          onClick={() => setSelectedSize(size)}
-                          className={`px-6 py-2.5 border rounded-sm transition-all flex flex-col items-center justify-center min-w-[100px] ${
-                            isSelected 
-                              ? 'border-accent bg-accent/15 text-foreground ring-1 ring-accent font-bold shadow-sm' 
-                              : 'border-border text-foreground/80 hover:border-accent/60 bg-secondary/20'
-                          }`}
-                        >
-                          <span className="text-xs font-bold tracking-widest uppercase">{size}</span>
-                          {v?.price ? (
-                            <span className={`text-[11px] mt-0.5 ${isSelected ? 'text-accent font-extrabold' : 'text-foreground/60'}`}>
-                              ₹{v.price.toLocaleString('en-IN')}
-                            </span>
-                          ) : null}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Status */}
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="uppercase tracking-widest text-[10px] font-semibold text-foreground/60">Availability:</span>
-                <span className={`uppercase tracking-widest text-[10px] font-semibold ${inStock ? 'text-green-500' : 'text-destructive'}`}>
-                  {inStock ? 'In Stock' : 'Out of Stock'}
-                </span>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col space-y-4">
-                <div className="flex space-x-4 h-14">
-                  {/* Quantity */}
-                  <div className="flex items-center border border-border px-4 py-2 space-x-4 w-32 shrink-0 justify-between rounded-sm">
-                    <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="text-foreground/50 hover:text-foreground transition-colors">
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="font-medium">{quantity}</span>
-                    <button onClick={() => setQuantity(quantity + 1)} className="text-foreground/50 hover:text-foreground transition-colors">
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  {/* Add to Cart */}
-                  <button 
-                    onClick={() => {
-                      if (inStock) {
-                        addItem({
-                          productId: product.id,
-                          name: product.name,
-                          price: currentPrice,
-                          imageUrl: product.imageUrl || "/placeholder.jpg",
-                          quantity,
-                          size: selectedSize || product.sizes[0] || "Standard"
-                        })
-                      }
-                    }}
-                    disabled={!inStock}
-                    className="flex-1 bg-primary text-primary-foreground font-semibold uppercase tracking-widest text-xs hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed rounded-sm"
-                  >
-                    Add to Cart
-                  </button>
-                  
-                  {/* Wishlist */}
-                  <button className="w-14 shrink-0 flex items-center justify-center border border-border text-foreground hover:text-destructive hover:border-destructive transition-colors rounded-sm">
-                    <Heart className="w-5 h-5" />
-                  </button>
-                </div>
-                
-                {/* Buy Now & WhatsApp */}
-                <div className="grid grid-cols-2 gap-4 h-12">
-                  <button 
-                    onClick={handleBuyNow}
-                    disabled={!inStock}
-                    className="bg-accent text-primary font-semibold uppercase tracking-widest text-xs hover:bg-accent/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed rounded-sm"
-                  >
-                    Buy Now
-                  </button>
-                  <a 
-                    href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919082377314'}?text=${encodeURIComponent(`Hello, I'm interested in ordering ${product.name} (${selectedSize || product.sizes[0]})`)}`} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="flex items-center justify-center space-x-2 border border-border text-foreground font-semibold uppercase tracking-widest text-xs hover:bg-secondary transition-colors rounded-sm"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>WhatsApp</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Guarantees */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="flex flex-col space-y-3 items-start sm:items-center sm:text-center text-foreground/70">
-                <Truck className="w-5 h-5" />
-                <span className="text-[10px] uppercase tracking-widest font-medium leading-relaxed">Free Shipping<br/>in Mumbai</span>
-              </div>
-              <div className="flex flex-col space-y-3 items-start sm:items-center sm:text-center text-foreground/70">
-                <ShieldCheck className="w-5 h-5" />
-                <span className="text-[10px] uppercase tracking-widest font-medium leading-relaxed">100% Authentic<br/>Guaranteed</span>
-              </div>
-              <div className="flex flex-col space-y-3 items-start sm:items-center sm:text-center text-foreground/70">
-                <RefreshCw className="w-5 h-5" />
-                <span className="text-[10px] uppercase tracking-widest font-medium leading-relaxed">7-Day Return<br/>Policy</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Details Section */}
-        <div className="mt-32 pt-16 border-t border-border/50">
-          <div className="flex flex-wrap gap-8 mb-12 border-b border-border/30">
-            {['description', 'fragrance pyramid', 'shipping & returns'].map((tab) => (
-              <button 
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-4 text-xs font-semibold uppercase tracking-widest transition-colors relative ${activeTab === tab ? 'text-foreground' : 'text-foreground/40 hover:text-foreground/80'}`}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-accent" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="max-w-4xl min-h-[200px]">
-            {activeTab === 'description' && (
-              <div className="text-foreground/80 leading-loose space-y-6 text-sm font-light">
-                <p className="whitespace-pre-line">{product.description}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 pt-6 mt-6 border-t border-border/30">
-                  {product.fragranceFamily && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-semibold uppercase tracking-widest text-foreground/50">Family:</span>
-                      <span className="text-sm">{product.fragranceFamily}</span>
-                    </div>
-                  )}
-                  {product.longevity && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-semibold uppercase tracking-widest text-foreground/50">Longevity:</span>
-                      <span className="text-sm">{product.longevity}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-foreground/50">SKU:</span>
-                    <span className="text-sm">{product.sku}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {activeTab === 'fragrance pyramid' && (
-              <div className="space-y-12">
-                {product.topNotes || product.middleNotes || product.baseNotes ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-sm font-light">
-                    {product.topNotes && product.topNotes.length > 0 && (
-                      <div className="space-y-4">
-                        <h4 className="font-heading font-semibold text-lg text-foreground tracking-tight border-b border-border/30 pb-2">Top Notes</h4>
-                        <ul className="space-y-3 text-foreground/70">
-                          {product.topNotes.map(note => <li key={note} className="flex items-center space-x-2"><span className="w-1.5 h-1.5 rounded-full bg-accent/50" /><span>{note}</span></li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {product.middleNotes && product.middleNotes.length > 0 && (
-                      <div className="space-y-4">
-                        <h4 className="font-heading font-semibold text-lg text-foreground tracking-tight border-b border-border/30 pb-2">Heart Notes</h4>
-                        <ul className="space-y-3 text-foreground/70">
-                          {product.middleNotes.map(note => <li key={note} className="flex items-center space-x-2"><span className="w-1.5 h-1.5 rounded-full bg-accent/50" /><span>{note}</span></li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {product.baseNotes && product.baseNotes.length > 0 && (
-                      <div className="space-y-4">
-                        <h4 className="font-heading font-semibold text-lg text-foreground tracking-tight border-b border-border/30 pb-2">Base Notes</h4>
-                        <ul className="space-y-3 text-foreground/70">
-                          {product.baseNotes.map(note => <li key={note} className="flex items-center space-x-2"><span className="w-1.5 h-1.5 rounded-full bg-accent/50" /><span>{note}</span></li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-foreground/70 text-sm font-light">
-                    Detailed fragrance pyramid is not available for this product. See main description for scent profile.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'shipping & returns' && (
-              <div className="text-foreground/80 leading-loose space-y-6 text-sm font-light">
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-foreground uppercase tracking-widest text-xs flex items-center gap-2">
-                    <Truck className="w-3.5 h-3.5 text-accent" /> Shipping Policy
-                  </h4>
-                  <p className="whitespace-pre-line leading-relaxed">{policies.shippingPolicy}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
-                    <div className="p-3 bg-secondary/30 rounded-sm border border-border/40">
-                      <span className="font-semibold text-foreground block mb-0.5">Mumbai Metro:</span>
-                      <span className="text-foreground/70">{policies.expressDeliveryMumbai}</span>
-                    </div>
-                    <div className="p-3 bg-secondary/30 rounded-sm border border-border/40">
-                      <span className="font-semibold text-foreground block mb-0.5">Rest of India:</span>
-                      <span className="text-foreground/70">{policies.panIndiaDelivery}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 pt-4 border-t border-border/30">
-                  <h4 className="font-semibold text-foreground uppercase tracking-widest text-xs flex items-center gap-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-accent" /> Return & Exchange Policy
-                  </h4>
-                  <p className="whitespace-pre-line leading-relaxed">{policies.returnPolicy}</p>
-                </div>
-
-                <div className="pt-6 flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                  <input type="text" placeholder="Enter 6-Digit Pincode" className="border border-border bg-transparent px-4 py-3 w-full sm:w-64 focus:border-accent outline-none text-sm rounded-sm font-mono" />
-                  <button className="px-6 py-3 border border-border text-xs font-semibold uppercase tracking-widest hover:border-accent hover:text-accent transition-colors rounded-sm shrink-0">
-                    Check Availability
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Related Products */}
-        {relatedProducts.length > 0 && (
-          <div className="mt-32">
-            <div className="flex items-center justify-between mb-12">
-              <h2 className="font-heading text-3xl font-bold tracking-tight">You May Also Like</h2>
-              <a href={`/shop?category=${product.category.toLowerCase()}`} className="text-xs font-semibold uppercase tracking-widest text-accent hover:text-accent/80 transition-colors">
-                View All {product.category}
-              </a>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {relatedProducts.map(p => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        )}
-      </Container>
-    </div>
+    <>
+      {/* Google Shopping & Schema.org Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <ProductDetailView
+        product={product}
+        relatedProducts={relatedProducts}
+        initialVariantSku={variantParam}
+        policies={policies}
+      />
+    </>
   )
 }

@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  async rewrites() {
+    return [
+      {
+        source: "/products/:slug",
+        destination: "/product/:slug",
+      },
+    ];
+  },
   // Free up RAM by quickly purging inactive pages from memory
   onDemandEntries: {
     maxInactiveAge: 15 * 1000,

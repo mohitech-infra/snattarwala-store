@@ -223,9 +223,14 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
           icon: TicketPercent,
           badge: counts.activeCoupons > 0 ? `${counts.activeCoupons} Active` : undefined,
           badgeColor: "text-accent bg-accent/10"
+        },
+        {
+          name: "Google Shopping Feed",
+          href: "/admin/google-shopping",
+          icon: Megaphone,
         }
       ],
-      allowedRoles: ["admin"]
+      allowedRoles: ["admin", "store_manager"]
     },
     {
       title: "WEBSITE & CONTENT",

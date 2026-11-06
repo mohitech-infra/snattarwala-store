@@ -1,32 +1,84 @@
-import { MetadataRoute } from 'next'
+import { MetadataRoute } from "next"
+import { getPublicProducts } from "@/lib/public-service"
+import { getBaseSiteUrl } from "@/lib/google-shopping-service"
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://snattarwala.in'
-  
-  return [
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = getBaseSiteUrl()
+  const now = new Date()
+
+  // Static core routes
+  const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 1,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 1.0,
     },
     {
       url: `${baseUrl}/shop`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/wholesale`,
+      lastModified: now,
+      changeFrequency: "weekly",
       priority: 0.8,
     },
     {
       url: `${baseUrl}/about`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
     },
     {
       url: `${baseUrl}/contact`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/shipping`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
       priority: 0.5,
     },
+    {
+      url: `${baseUrl}/terms`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/faq`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    },
   ]
+
+  // Dynamic product routes
+  try {
+    const products = await getPublicProducts()
+    const productRoutes: MetadataRoute.Sitemap = products
+      .filter((p) => p.slug)
+      .map((p) => ({
+        url: `${baseUrl}/product/${p.slug}`,
+        lastModified: now,
+        changeFrequency: "daily",
+        priority: 0.9,
+      }))
+
+    return [...staticRoutes, ...productRoutes]
+  } catch (err) {
+    console.error("Error generating dynamic sitemap:", err)
+    return staticRoutes
+  }
 }
