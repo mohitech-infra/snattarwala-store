@@ -15,7 +15,7 @@ export async function GET() {
     const { data: dbProducts, error } = await supabase
       .from("products")
       .select(`
-        id, name, slug, sku, price, compare_at_price, stock_quantity,
+        id, name, slug, sku, price, compare_at_price, stock_quantity, size, variants,
         gender, fragrance_type, top_notes, middle_notes, base_notes,
         rating, review_count, featured, best_seller, new_arrival, is_active,
         image_url, description, short_description, tags,
@@ -70,6 +70,29 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase()
 
+    // Process and normalize product sizes & variant pricing
+    let variants = Array.isArray(body.variants) && body.variants.length > 0 ? body.variants : []
+    let finalPrice = price
+    let finalCompareAtPrice = body.salePrice || body.compare_at_price || null
+    let totalStock = Number(body.stock ?? body.stock_quantity) || 20
+    let sizeStr = body.size || ""
+
+    if (variants.length > 0) {
+      // Find default variant or lowest price variant
+      const defaultVar = variants.find((v: any) => v.isDefault) || variants[0]
+      if (defaultVar && defaultVar.price !== undefined) {
+        finalPrice = Number(defaultVar.price) || price
+      }
+      if (defaultVar && defaultVar.compareAtPrice !== undefined) {
+        finalCompareAtPrice = defaultVar.compareAtPrice ? Number(defaultVar.compareAtPrice) : null
+      }
+      const sumStock = variants.reduce((sum: number, v: any) => sum + (Number(v.stock ?? v.stock_quantity) || 0), 0)
+      if (sumStock > 0) {
+        totalStock = sumStock
+      }
+      sizeStr = variants.map((v: any) => v.size).filter(Boolean).join(", ")
+    }
+
     const insertPayload: Record<string, any> = {
       name,
       slug,
@@ -77,9 +100,11 @@ export async function POST(req: NextRequest) {
       category, // Guarantees NOT NULL constraint is always satisfied
       category_id,
       image_url,
-      price,
-      compare_at_price: body.salePrice || body.compare_at_price || null,
-      stock_quantity: Number(body.stock ?? body.stock_quantity) || 20,
+      price: finalPrice,
+      compare_at_price: finalCompareAtPrice,
+      stock_quantity: totalStock,
+      size: sizeStr || null,
+      variants: variants.length > 0 ? variants : [],
       gender: body.gender || "Unisex",
       fragrance_type: category === "Attars" ? "Attar Oil" : category === "Bakhoor" ? "Incense Wood" : "Eau De Parfum",
       top_notes: topNotes,
@@ -177,6 +202,24 @@ export async function PATCH(req: NextRequest) {
     if (updates.series !== undefined) {
       payload.tags = updates.series ? [updates.series] : []
       payload.series = updates.series || null
+    }
+    if (updates.size !== undefined) payload.size = updates.size
+    if (updates.variants !== undefined && Array.isArray(updates.variants)) {
+      payload.variants = updates.variants
+      if (updates.variants.length > 0) {
+        const defaultVar = updates.variants.find((v: any) => v.isDefault) || updates.variants[0]
+        if (defaultVar && defaultVar.price !== undefined) {
+          payload.price = Number(defaultVar.price)
+        }
+        if (defaultVar && defaultVar.compareAtPrice !== undefined) {
+          payload.compare_at_price = defaultVar.compareAtPrice ? Number(defaultVar.compareAtPrice) : null
+        }
+        const totalStock = updates.variants.reduce((sum: number, v: any) => sum + (Number(v.stock ?? v.stock_quantity) || 0), 0)
+        if (totalStock > 0) {
+          payload.stock_quantity = totalStock
+        }
+        payload.size = updates.variants.map((v: any) => v.size).filter(Boolean).join(", ")
+      }
     }
 
     const supabase = getSupabase()

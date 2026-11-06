@@ -16,7 +16,7 @@ export interface AdminProduct {
   fragranceFamily: string
   price: number
   costPrice: number
-  salePrice?: number
+  salePrice?: number | null
   stock: number
   reservedStock: number
   reorderLevel: number
@@ -26,7 +26,8 @@ export interface AdminProduct {
   reviewsCount: number
   status: "Active" | "Draft" | "Low Stock" | "Out of Stock"
   imageUrl: string
-  variants: { size: string; sku: string; price: number; stock: number }[]
+  variants: { size: string; sku?: string; price: number; stock: number; compareAtPrice?: number | null; isDefault?: boolean }[]
+  size?: string
   notes: { top: string[]; heart: string[]; base: string[] }
   isFeatured?: boolean
   isBestseller?: boolean
@@ -180,7 +181,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
     const { data: dbProducts, error } = await supabase
       .from("products")
       .select(`
-        id, name, slug, sku, price, compare_at_price, stock_quantity,
+        id, name, slug, sku, price, compare_at_price, stock_quantity, size, variants,
         gender, fragrance_type, top_notes, middle_notes, base_notes,
         rating, review_count, featured, best_seller, new_arrival, is_active,
         image_url, description, short_description, tags,
@@ -282,10 +283,25 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
         imageUrl: primaryImg,
         description: p.description || "",
         shortDescription: p.short_description || "",
-        variants: [
-          { size: "50ml", sku: `${p.sku || 'SKU'}-50`, price: Number(p.price), stock: Math.floor(stock * 0.6) },
-          { size: "100ml", sku: `${p.sku || 'SKU'}-100`, price: Math.round(Number(p.price) * 1.6), stock: Math.floor(stock * 0.4) }
-        ],
+        variants: Array.isArray(p.variants) && p.variants.length > 0
+          ? p.variants.map((v: any, idx: number) => ({
+              size: v.size || "Standard",
+              sku: v.sku || `${p.sku || 'SKU'}-${v.size || idx}`,
+              price: Number(v.price) || Number(p.price) || 1500,
+              compareAtPrice: v.compareAtPrice !== undefined ? Number(v.compareAtPrice) : (p.compare_at_price ? Number(p.compare_at_price) : undefined),
+              stock: Number(v.stock ?? v.stock_quantity) || 0,
+              isDefault: Boolean(v.isDefault ?? (idx === 0))
+            }))
+          : (p.size ? p.size.split(",").map((s: string, idx: number) => ({
+              size: s.trim(),
+              sku: `${p.sku || 'SKU'}-${s.trim()}`,
+              price: Number(p.price) || 1500,
+              compareAtPrice: p.compare_at_price ? Number(p.compare_at_price) : undefined,
+              stock: stock,
+              isDefault: idx === 0
+            })) : [
+              { size: p.fragrance_type?.includes("Attar") ? "12ml" : "100ml", sku: `${p.sku || 'SKU'}-STD`, price: Number(p.price) || 1500, stock, isDefault: true }
+            ]),
         notes: {
           top: p.top_notes ? p.top_notes.split(",").map((s: string) => s.trim()) : ["Bergamot"],
           heart: p.middle_notes ? p.middle_notes.split(",").map((s: string) => s.trim()) : ["Rose", "Oud"],

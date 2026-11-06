@@ -36,7 +36,8 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
       const found = allProducts.find(p => p.slug === slug)
       if (found) {
         setProduct(found)
-        setSelectedSize(found.sizes[0] || "")
+        const defaultVar = found.variants?.find(v => v.isDefault) || found.variants?.[0]
+        setSelectedSize(defaultVar ? defaultVar.size : (found.sizes[0] || ""))
         setSelectedImage(found.imageUrl || "")
         setRelatedProducts(allProducts.filter(p => p.category === found.category && p.id !== found.id).slice(0, 4))
       }
@@ -52,33 +53,34 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     notFound()
   }
 
+  // Active variant resolution for dynamic price and stock per size
+  const activeVariant = product.variants?.find(v => v.size === selectedSize)
+  const currentPrice = activeVariant ? activeVariant.price : product.price
+  const currentCompareAtPrice = activeVariant?.compareAtPrice !== undefined ? activeVariant.compareAtPrice : product.compareAtPrice
+  const discount = currentCompareAtPrice && currentCompareAtPrice > currentPrice 
+    ? Math.round(((currentCompareAtPrice - currentPrice) / currentCompareAtPrice) * 100) 
+    : 0
+
+  const inStock = activeVariant?.stock !== undefined ? activeVariant.stock > 0 : (product.inStock ?? true)
+
   const handleBuyNow = () => {
-    // Basic instock check mock - since PublicProduct doesn't have inStock yet
-    const inStock = true
     if (inStock) {
       addItem({
         productId: product.id,
         name: product.name,
-        price: product.price,
+        price: currentPrice,
         imageUrl: product.imageUrl || "/placeholder.jpg",
         quantity,
-        size: selectedSize || product.sizes[0]
+        size: selectedSize || product.sizes[0] || "Standard"
       })
       setIsCartOpen(false)
       router.push("/checkout")
     }
   }
-  
-  const discount = product.compareAtPrice 
-    ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100) 
-    : 0
 
   const gallery = product.imageGallery && product.imageGallery.length > 0 
     ? product.imageGallery 
     : [product.imageUrl]
-
-  // Mock inStock for now
-  const inStock = true
 
   return (
     <div className="py-12 bg-background min-h-screen">
@@ -168,11 +170,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             </div>
 
             <div className="flex items-baseline space-x-4 mb-6">
-              <span className="text-3xl font-semibold tracking-tight">₹{product.price.toLocaleString('en-IN')}</span>
-              {product.compareAtPrice && product.compareAtPrice > product.price && (
+              <span className="text-3xl font-semibold tracking-tight">₹{currentPrice.toLocaleString('en-IN')}</span>
+              {currentCompareAtPrice && currentCompareAtPrice > currentPrice && (
                 <>
-                  <span className="text-xl text-foreground/40 line-through tracking-tight">₹{product.compareAtPrice.toLocaleString('en-IN')}</span>
-                  <span className="text-sm font-bold text-red-500 tracking-wider">({Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)}% OFF)</span>
+                  <span className="text-xl text-foreground/40 line-through tracking-tight">₹{currentCompareAtPrice.toLocaleString('en-IN')}</span>
+                  <span className="text-sm font-bold text-red-500 tracking-wider">({discount}% OFF)</span>
                 </>
               )}
             </div>
@@ -187,22 +189,39 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             )}
 
             <div className="space-y-8 mb-10 flex-grow border-t border-b border-border/50 py-8">
-              {/* Size Selection */}
+              {/* Size Selection with Dynamic Price Badges */}
               {product.sizes && product.sizes.length > 0 && (
                 <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-foreground/80">Select Size</span>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-foreground/80">Select Fragrance Size</span>
+                    <span className="text-[11px] text-accent font-semibold">
+                      {activeVariant ? `Active: ${activeVariant.size} (₹${activeVariant.price.toLocaleString("en-IN")})` : `Selected: ${selectedSize}`}
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    {product.sizes.map((size) => (
-                      <button 
-                        key={size}
-                        onClick={() => setSelectedSize(size)}
-                        className={`px-8 py-3 border ${selectedSize === size ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border text-foreground hover:border-foreground'} transition-all text-xs font-medium tracking-widest uppercase rounded-sm`}
-                      >
-                        {size}
-                      </button>
-                    ))}
+                    {product.sizes.map((size) => {
+                      const v = product.variants?.find((varItem) => varItem.size === size)
+                      const isSelected = selectedSize === size
+
+                      return (
+                        <button 
+                          key={size}
+                          onClick={() => setSelectedSize(size)}
+                          className={`px-6 py-2.5 border rounded-sm transition-all flex flex-col items-center justify-center min-w-[100px] ${
+                            isSelected 
+                              ? 'border-accent bg-accent/15 text-foreground ring-1 ring-accent font-bold shadow-sm' 
+                              : 'border-border text-foreground/80 hover:border-accent/60 bg-secondary/20'
+                          }`}
+                        >
+                          <span className="text-xs font-bold tracking-widest uppercase">{size}</span>
+                          {v?.price ? (
+                            <span className={`text-[11px] mt-0.5 ${isSelected ? 'text-accent font-extrabold' : 'text-foreground/60'}`}>
+                              ₹{v.price.toLocaleString('en-IN')}
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -236,10 +255,10 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         addItem({
                           productId: product.id,
                           name: product.name,
-                          price: product.price,
+                          price: currentPrice,
                           imageUrl: product.imageUrl || "/placeholder.jpg",
                           quantity,
-                          size: selectedSize || product.sizes[0]
+                          size: selectedSize || product.sizes[0] || "Standard"
                         })
                       }
                     }}

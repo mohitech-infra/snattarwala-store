@@ -17,11 +17,344 @@ import {
   AlertTriangle,
   Layers,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  Star,
+  Tag,
+  Box
 } from "lucide-react"
 import { getAdminProducts, createAdminProduct, deleteAdminProduct, updateAdminProduct, clearAllAdminProducts, AdminProduct } from "@/lib/admin-service"
 import { ExportMenu } from "@/components/admin/export-menu"
 import { ProductImageDropzone } from "@/components/admin/product-image-dropzone"
+
+interface VariantItem {
+  size: string
+  price: number
+  compareAtPrice?: number | null
+  stock: number
+  sku?: string
+  isDefault?: boolean
+}
+
+const CATEGORY_SIZE_PRESETS: Record<string, string[]> = {
+  "Attars": ["3ml", "6ml", "12ml", "25ml"],
+  "Perfumes": ["30ml", "50ml", "100ml"],
+  "Bakhoor": ["40g", "50g", "100g", "250g"]
+}
+
+function ProductVariantsEditor({
+  category,
+  baseSku,
+  basePrice,
+  variants = [],
+  onChange
+}: {
+  category: string
+  baseSku: string
+  basePrice: number
+  variants?: VariantItem[]
+  onChange: (updated: VariantItem[]) => void
+}) {
+  const [customSize, setCustomSize] = useState("")
+  const presets = CATEGORY_SIZE_PRESETS[category] || CATEGORY_SIZE_PRESETS["Attars"]
+  const currentVariants = Array.isArray(variants) ? variants : []
+
+  const handleAddPreset = (sizeName: string) => {
+    if (currentVariants.some(v => v.size.toLowerCase() === sizeName.toLowerCase())) return
+
+    let price = basePrice || 1500
+    if (sizeName === "3ml") price = Math.round(price * 0.55)
+    else if (sizeName === "6ml") price = Math.round(price * 0.8)
+    else if (sizeName === "12ml") price = price
+    else if (sizeName === "25ml") price = Math.round(price * 1.85)
+    else if (sizeName === "30ml") price = Math.round(price * 0.65)
+    else if (sizeName === "50ml") price = Math.round(price * 0.85)
+    else if (sizeName === "100ml") price = price
+    else if (sizeName === "40g") price = Math.round(price * 0.8)
+    else if (sizeName === "50g") price = price
+    else if (sizeName === "100g") price = Math.round(price * 1.75)
+    else if (sizeName === "250g") price = Math.round(price * 3.8)
+
+    const cleanSku = (baseSku || "SNA").trim().toUpperCase()
+    const skuCode = `${cleanSku}-${sizeName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}`
+    const isFirst = currentVariants.length === 0
+
+    onChange([
+      ...currentVariants,
+      {
+        size: sizeName,
+        price,
+        compareAtPrice: Math.round(price * 1.25),
+        stock: 20,
+        sku: skuCode,
+        isDefault: isFirst
+      }
+    ])
+  }
+
+  const handleAddCustom = () => {
+    const trimmed = customSize.trim()
+    if (!trimmed) return
+    if (currentVariants.some(v => v.size.toLowerCase() === trimmed.toLowerCase())) {
+      setCustomSize("")
+      return
+    }
+    const cleanSku = (baseSku || "SNA").trim().toUpperCase()
+    const skuCode = `${cleanSku}-${trimmed.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}`
+    const price = basePrice || 1500
+    const isFirst = currentVariants.length === 0
+
+    onChange([
+      ...currentVariants,
+      {
+        size: trimmed,
+        price,
+        compareAtPrice: Math.round(price * 1.25),
+        stock: 20,
+        sku: skuCode,
+        isDefault: isFirst
+      }
+    ])
+    setCustomSize("")
+  }
+
+  const handleUpdateVariant = (index: number, field: keyof VariantItem, value: any) => {
+    const copy = [...currentVariants]
+    if (field === "isDefault" && value === true) {
+      copy.forEach((v, i) => { v.isDefault = i === index })
+    } else {
+      copy[index] = { ...copy[index], [field]: value }
+    }
+    onChange(copy)
+  }
+
+  const handleRemoveVariant = (index: number) => {
+    const copy = currentVariants.filter((_, i) => i !== index)
+    if (copy.length > 0 && !copy.some(v => v.isDefault)) {
+      copy[0].isDefault = true
+    }
+    onChange(copy)
+  }
+
+  const totalStock = currentVariants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+  const defaultVar = currentVariants.find(v => v.isDefault) || currentVariants[0]
+
+  return (
+    <div className="space-y-4 bg-background/50 border border-border/80 rounded-md p-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
+            <Box className="w-3.5 h-3.5" />
+            <span>Product Sizes & Size-Specific Pricing *</span>
+          </label>
+          <p className="text-[11px] text-foreground/60 mt-0.5">
+            Define individual fragrance sizes (e.g. 6ml, 12ml, 50ml, 100ml), selling prices, and stocks.
+          </p>
+        </div>
+        {currentVariants.length > 0 && (
+          <div className="flex items-center gap-2 text-[10px] font-mono bg-secondary px-2.5 py-1 rounded-sm border border-border">
+            <span className="text-foreground/70">{currentVariants.length} Sizes Configured</span>
+            <span>•</span>
+            <span className="text-emerald-500 font-bold">{totalStock} Total Units</span>
+          </div>
+        )}
+      </div>
+
+      {/* 1-Click Quick Preset Pills */}
+      <div>
+        <span className="text-[10px] uppercase font-semibold tracking-wider text-foreground/60 block mb-1.5">
+          1-Click Preset Sizes for {category}:
+        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {presets.map((sizeName) => {
+            const isAdded = currentVariants.some(v => v.size.toLowerCase() === sizeName.toLowerCase())
+            return (
+              <button
+                key={sizeName}
+                type="button"
+                onClick={() => handleAddPreset(sizeName)}
+                disabled={isAdded}
+                className={`px-3 py-1 rounded text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 ${
+                  isAdded
+                    ? "bg-accent/20 text-accent border border-accent/40 opacity-70 cursor-not-allowed"
+                    : "bg-secondary hover:bg-accent/15 hover:border-accent/50 text-foreground border border-border cursor-pointer"
+                }`}
+              >
+                {isAdded ? <Check className="w-3 h-3 text-accent" /> : <Plus className="w-3 h-3" />}
+                <span>+ {sizeName}</span>
+              </button>
+            )
+          })}
+
+          {/* Custom Size Form */}
+          <div className="flex items-center gap-1.5 sm:ml-auto w-full sm:w-auto mt-2 sm:mt-0">
+            <input
+              type="text"
+              value={customSize}
+              onChange={(e) => setCustomSize(e.target.value)}
+              placeholder="Custom size (e.g. 15ml, 250g)"
+              className="bg-background border border-border rounded-sm py-1 px-2.5 text-xs text-foreground focus:outline-none focus:border-accent w-full sm:w-44"
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustom(); } }}
+            />
+            <button
+              type="button"
+              onClick={handleAddCustom}
+              className="px-3 py-1 bg-secondary hover:bg-accent hover:text-slate-950 text-foreground border border-border rounded-sm text-xs font-semibold transition-colors shrink-0"
+            >
+              + Add Size
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Variants Table / List */}
+      {currentVariants.length === 0 ? (
+        <div className="p-6 border border-dashed border-border/80 rounded-md text-center bg-secondary/10">
+          <p className="text-xs text-foreground/70 mb-1.5 font-bold">No sizes added yet.</p>
+          <p className="text-[11px] text-foreground/50 mb-3">Click any quick preset size button above to configure your first size.</p>
+          <div className="flex justify-center gap-2">
+            {presets.slice(0, 2).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handleAddPreset(s)}
+                className="px-3 py-1.5 bg-accent text-slate-950 rounded text-xs font-bold uppercase tracking-wider hover:bg-accent/90 transition-colors"
+              >
+                + Add {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-wider text-foreground/50 px-2">
+            <div className="col-span-2">Size Name</div>
+            <div className="col-span-3">Selling Price (₹) *</div>
+            <div className="col-span-3">MRP (Compare ₹)</div>
+            <div className="col-span-2">Stock (Units)</div>
+            <div className="col-span-2 text-right">Default / Remove</div>
+          </div>
+
+          <div className="space-y-2">
+            {currentVariants.map((v, idx) => {
+              const discount = v.compareAtPrice && v.compareAtPrice > v.price
+                ? Math.round(((v.compareAtPrice - v.price) / v.compareAtPrice) * 100)
+                : 0
+
+              return (
+                <div
+                  key={idx}
+                  className={`p-3 sm:p-2.5 rounded-sm border transition-colors grid grid-cols-1 sm:grid-cols-12 gap-2 items-center ${
+                    v.isDefault ? "border-accent/70 bg-accent/5 ring-1 ring-accent/30" : "border-border/70 bg-card hover:border-border"
+                  }`}
+                >
+                  {/* Size Name */}
+                  <div className="sm:col-span-2 flex items-center gap-1.5">
+                    <span className="text-[10px] text-foreground/50 sm:hidden w-24">Size:</span>
+                    <input
+                      type="text"
+                      required
+                      value={v.size}
+                      onChange={(e) => handleUpdateVariant(idx, "size", e.target.value)}
+                      placeholder="e.g. 6ml"
+                      className="w-full bg-background border border-border rounded-sm py-1.5 px-2.5 text-xs font-bold text-foreground focus:outline-none focus:border-accent"
+                    />
+                  </div>
+
+                  {/* Selling Price */}
+                  <div className="sm:col-span-3 flex items-center gap-1.5">
+                    <span className="text-[10px] text-foreground/50 sm:hidden w-24">Selling Price:</span>
+                    <div className="relative w-full">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/50 text-xs">₹</span>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={v.price}
+                        onChange={(e) => handleUpdateVariant(idx, "price", Number(e.target.value))}
+                        className="w-full bg-background border border-border rounded-sm py-1.5 pl-6 pr-2.5 text-xs font-bold text-foreground focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Compare Price */}
+                  <div className="sm:col-span-3 flex items-center gap-1.5">
+                    <span className="text-[10px] text-foreground/50 sm:hidden w-24">MRP Price:</span>
+                    <div className="relative w-full">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/50 text-xs">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={v.compareAtPrice || ""}
+                        onChange={(e) => handleUpdateVariant(idx, "compareAtPrice", e.target.value ? Number(e.target.value) : null)}
+                        placeholder="MRP (Optional)"
+                        className="w-full bg-background border border-border rounded-sm py-1.5 pl-6 pr-2.5 text-xs text-foreground focus:outline-none focus:border-accent"
+                      />
+                      {discount > 0 && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-500">
+                          {discount}% off
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stock Quantity */}
+                  <div className="sm:col-span-2 flex items-center gap-1.5">
+                    <span className="text-[10px] text-foreground/50 sm:hidden w-24">Stock:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={v.stock}
+                      onChange={(e) => handleUpdateVariant(idx, "stock", Number(e.target.value))}
+                      className="w-full bg-background border border-border rounded-sm py-1.5 px-2.5 text-xs text-foreground focus:outline-none focus:border-accent font-semibold"
+                    />
+                  </div>
+
+                  {/* Default / Actions */}
+                  <div className="sm:col-span-2 flex items-center justify-end gap-1.5 pt-1 sm:pt-0">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateVariant(idx, "isDefault", true)}
+                      className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
+                        v.isDefault
+                          ? "bg-accent text-slate-950 shadow-xs"
+                          : "bg-secondary text-foreground/60 hover:text-foreground hover:bg-secondary/80 border border-border"
+                      }`}
+                      title={v.isDefault ? "Default size shown first on store" : "Click to make this the default size"}
+                    >
+                      <Star className={`w-3 h-3 ${v.isDefault ? "fill-slate-950 text-slate-950" : ""}`} />
+                      <span>{v.isDefault ? "Default" : "Make Default"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveVariant(idx)}
+                      className="p-1.5 rounded hover:text-rose-500 hover:bg-rose-500/10 text-foreground/40 transition-colors"
+                      title="Remove size"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Real-time Summary Box */}
+          <div className="p-3 bg-secondary/30 rounded border border-border/50 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-accent" />
+              <span className="text-foreground/80">
+                Storefront Starting Price: <strong className="text-foreground">₹{defaultVar?.price ? defaultVar.price.toLocaleString("en-IN") : "0"}</strong>
+              </span>
+            </div>
+            <div className="text-[11px] text-foreground/60 font-mono">
+              Combined Inventory: <strong>{totalStock} units</strong> across {currentVariants.length} sizes
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<AdminProduct[]>([])
@@ -101,8 +434,22 @@ export default function AdminProductsPage() {
       return
     }
 
+    const variants = newProduct.variants && newProduct.variants.length > 0 ? newProduct.variants : []
+    const defaultVar = variants.find(v => v.isDefault) || variants[0]
+    const finalPrice = defaultVar ? defaultVar.price : (newProduct.price || 1500)
+    const finalSalePrice = defaultVar?.compareAtPrice !== undefined ? defaultVar.compareAtPrice : (newProduct.salePrice || null)
+    const totalStock = variants.length > 0
+      ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+      : (newProduct.stock || 20)
+    const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (newProduct.size || "")
+
     const productToCreate = {
       ...newProduct,
+      price: finalPrice,
+      salePrice: finalSalePrice,
+      stock: totalStock,
+      size: sizeSummary,
+      variants,
       category: newProduct.category || "Attars",
       sku: newProduct.sku?.trim() || `SNA-${newProduct.name.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
       imageUrl: newProduct.imageUrl || "/products/white-oudh-attar.jpg",
@@ -122,6 +469,7 @@ export default function AdminProductsPage() {
         gender: "Unisex",
         fragranceFamily: "Oud",
         price: 1500,
+        salePrice: 1800,
         costPrice: 500,
         stock: 20,
         reorderLevel: 5,
@@ -130,9 +478,13 @@ export default function AdminProductsPage() {
         description: "",
         shortDescription: "",
         notes: { top: ["Bergamot"], heart: ["Agarwood"], base: ["Amber"] },
+        variants: [
+          { size: "6ml", sku: "SNA-6ML", price: 1500, stock: 12, compareAtPrice: 1800, isDefault: true },
+          { size: "12ml", sku: "SNA-12ML", price: 2800, stock: 8, compareAtPrice: 3200, isDefault: false }
+        ]
       })
       await loadProducts()
-      alert("✅ New luxury fragrance published to database successfully!")
+      alert("✅ New luxury fragrance published to database successfully with size variants!")
     } else {
       alert(`Failed to save product: ${res.error}`)
     }
@@ -142,18 +494,52 @@ export default function AdminProductsPage() {
     e.preventDefault()
     if (!editingProduct || !editingProduct.id) return
 
-    const ok = await updateAdminProduct(editingProduct.id, editingProduct)
+    const variants = editingProduct.variants && editingProduct.variants.length > 0 ? editingProduct.variants : []
+    const defaultVar = variants.find(v => v.isDefault) || variants[0]
+    const finalPrice = defaultVar ? defaultVar.price : (editingProduct.price || 1500)
+    const finalSalePrice = defaultVar?.compareAtPrice !== undefined ? defaultVar.compareAtPrice : (editingProduct.salePrice || null)
+    const totalStock = variants.length > 0
+      ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+      : (editingProduct.stock || 20)
+    const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (editingProduct.size || "")
+
+    const productToUpdate = {
+      ...editingProduct,
+      price: finalPrice,
+      salePrice: finalSalePrice,
+      stock: totalStock,
+      size: sizeSummary,
+      variants
+    }
+
+    const ok = await updateAdminProduct(editingProduct.id, productToUpdate)
     if (ok) {
       setIsEditModalOpen(false)
       await loadProducts()
-      alert("✅ Product updated successfully!")
+      alert("✅ Product and size pricing updated successfully!")
     } else {
       alert("Failed to update product. (Check Supabase RLS Policies)")
     }
   }
 
   const openEditModal = (product: AdminProduct) => {
-    setEditingProduct(product)
+    const initialVariants = product.variants && product.variants.length > 0
+      ? product.variants
+      : (product.size ? product.size.split(",").map((s, idx) => ({
+          size: s.trim(),
+          sku: `${product.sku}-${s.trim()}`,
+          price: product.price,
+          compareAtPrice: product.salePrice || null,
+          stock: product.stock,
+          isDefault: idx === 0
+        })) : [
+          { size: product.category === "Perfumes" ? "100ml" : "12ml", sku: `${product.sku}-STD`, price: product.price, stock: product.stock, compareAtPrice: product.salePrice || null, isDefault: true }
+        ])
+
+    setEditingProduct({
+      ...product,
+      variants: initialVariants
+    })
     setIsEditModalOpen(true)
   }
 
@@ -419,7 +805,28 @@ export default function AdminProductsPage() {
                       {/* Price & Margin */}
                       <td className="px-5 py-4">
                         <p className="font-bold text-sm text-foreground">₹{product.price.toLocaleString('en-IN')}</p>
-                        <p className="text-[10px] text-foreground/50">Cost: ₹{product.costPrice} ({profitMargin}% margin)</p>
+                        {product.variants && product.variants.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-1 max-w-[220px]">
+                            {product.variants.map((v, i) => (
+                              <span
+                                key={i}
+                                className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                  v.isDefault
+                                    ? "bg-accent/20 text-accent font-semibold border border-accent/40"
+                                    : "bg-secondary text-foreground/75 border border-border"
+                                }`}
+                                title={v.sku ? `SKU: ${v.sku} | Stock: ${v.stock ?? 0}` : undefined}
+                              >
+                                {v.size}: ₹{v.price.toLocaleString('en-IN')}
+                              </span>
+                            ))}
+                          </div>
+                        ) : product.size ? (
+                          <span className="text-[10px] text-foreground/60 block mt-0.5 font-medium">
+                            Size: {product.size}
+                          </span>
+                        ) : null}
+                        <p className="text-[10px] text-foreground/50 mt-1">Cost: ₹{product.costPrice} ({profitMargin}% margin)</p>
                       </td>
 
                       {/* Stock Level */}
@@ -624,52 +1031,52 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* Pricing & Stock */}
+              {/* Product Sizes & Variant Pricing */}
               <div className="space-y-4">
                 <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">
-                  2. Pricing & Inventory Control
+                  2. Product Sizes & Size-Specific Pricing
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <ProductVariantsEditor
+                  category={newProduct.category || "Attars"}
+                  baseSku={newProduct.sku || "SNA"}
+                  basePrice={newProduct.price || 1500}
+                  variants={newProduct.variants}
+                  onChange={(vars) => {
+                    const defaultVar = vars.find(v => v.isDefault) || vars[0]
+                    const totalStock = vars.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+                    setNewProduct({
+                      ...newProduct,
+                      variants: vars,
+                      price: defaultVar ? defaultVar.price : newProduct.price,
+                      salePrice: defaultVar?.compareAtPrice ?? newProduct.salePrice,
+                      stock: vars.length > 0 ? totalStock : newProduct.stock,
+                      size: vars.map(v => v.size).join(", ")
+                    })
+                  }}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">MRP (Compare at) (₹)</label>
-                    <input
-                      type="number"
-                      value={newProduct.salePrice || ""}
-                      onChange={(e) => setNewProduct({...newProduct, salePrice: Number(e.target.value)})}
-                      className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Selling Price (₹) *</label>
-                    <input
-                      type="number"
-                      required
-                      value={newProduct.price}
-                      onChange={(e) => setNewProduct({...newProduct, price: Number(e.target.value)})}
-                      className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price (₹)</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price per Bottle (₹)</label>
                     <input
                       type="number"
                       value={newProduct.costPrice}
                       onChange={(e) => setNewProduct({...newProduct, costPrice: Number(e.target.value)})}
+                      placeholder="e.g. 500"
                       className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
                     />
+                    <p className="text-[10px] text-foreground/50 mt-1">Used for admin profit margin analytics calculation.</p>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Initial Stock (Units)</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Low Stock Alert Threshold (Units)</label>
                     <input
                       type="number"
-                      value={newProduct.stock}
-                      onChange={(e) => setNewProduct({...newProduct, stock: Number(e.target.value)})}
+                      value={newProduct.reorderLevel ?? 5}
+                      onChange={(e) => setNewProduct({...newProduct, reorderLevel: Number(e.target.value)})}
                       className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
                     />
+                    <p className="text-[10px] text-foreground/50 mt-1">Alerts you when total inventory falls below this amount.</p>
                   </div>
                 </div>
               </div>
@@ -876,31 +1283,44 @@ export default function AdminProductsPage() {
               </div>
 
               <div className="space-y-4">
-                <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">2. Pricing & Inventory</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">
+                  2. Product Sizes & Size-Specific Pricing
+                </h4>
+
+                <ProductVariantsEditor
+                  category={editingProduct.category || "Attars"}
+                  baseSku={editingProduct.sku || "SNA"}
+                  basePrice={editingProduct.price || 1500}
+                  variants={editingProduct.variants}
+                  onChange={(vars) => {
+                    const defaultVar = vars.find(v => v.isDefault) || vars[0]
+                    const totalStock = vars.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+                    setEditingProduct({
+                      ...editingProduct,
+                      variants: vars,
+                      price: defaultVar ? defaultVar.price : editingProduct.price,
+                      salePrice: defaultVar?.compareAtPrice ?? editingProduct.salePrice,
+                      stock: vars.length > 0 ? totalStock : editingProduct.stock,
+                      size: vars.map(v => v.size).join(", ")
+                    })
+                  }}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">MRP (Compare at) (₹)</label>
-                    <input type="number" value={editingProduct.salePrice || ""} onChange={(e) => setEditingProduct({...editingProduct, salePrice: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Selling Price (₹) *</label>
-                    <input required type="number" value={editingProduct.price || 0} onChange={(e) => setEditingProduct({...editingProduct, price: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price (₹)</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Cost Price per Bottle (₹)</label>
                     <input type="number" value={editingProduct.costPrice || 0} onChange={(e) => setEditingProduct({...editingProduct, costPrice: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
+                    <p className="text-[10px] text-foreground/50 mt-1">For profit analytics.</p>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Stock (Units)</label>
-                    <input type="number" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({...editingProduct, stock: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Reorder Alert (Units)</label>
+                    <input type="number" value={editingProduct.reorderLevel ?? 5} onChange={(e) => setEditingProduct({...editingProduct, reorderLevel: Number(e.target.value)})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
+                    <p className="text-[10px] text-foreground/50 mt-1">Low-stock warning point.</p>
                   </div>
-                  <div className="flex items-end">
-                    <label className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-foreground mb-2">
-                      <input type="checkbox" checked={editingProduct.is_active || false} onChange={(e) => setEditingProduct({...editingProduct, is_active: e.target.checked})} className="accent-accent w-4 h-4 rounded-sm border-border" />
-                      <span>Active Product</span>
+                  <div className="flex items-center pt-4">
+                    <label className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-foreground cursor-pointer">
+                      <input type="checkbox" checked={editingProduct.is_active ?? (editingProduct.status === 'Active')} onChange={(e) => setEditingProduct({...editingProduct, is_active: e.target.checked, status: e.target.checked ? 'Active' : 'Draft'})} className="accent-accent w-4 h-4 rounded-sm border-border" />
+                      <span>Active in Store</span>
                     </label>
                   </div>
                 </div>
