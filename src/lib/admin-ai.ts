@@ -1,4 +1,5 @@
 // ATTARWALA AI Advisor & Business Intelligence System
+// Live Operational Intelligence & Store Management Engine
 
 export interface AIInsight {
   id: string;
@@ -15,52 +16,28 @@ export interface AIInsight {
 
 export const ADMIN_AI_INSIGHTS: AIInsight[] = [
   {
-    id: "ins-1",
+    id: "ins-catalog",
     type: "HIGH",
     category: "Inventory",
-    title: "Ameer Al Oudh Bakhoor Stock Depletion Risk",
-    description: "Your Ameer Al Oudh Bakhoor is selling 34% faster than 30-day average. At current velocity of 4.2 units/day, remaining stock (5 units) will deplete in less than 36 hours.",
-    recommendedAction: "Authorize immediate transfer of 30 units from Crawford Market warehouse and place supplier PO.",
-    actionButtonLabel: "Restock Now",
-    actionTarget: "/admin/inventory",
-    metric: "36 hrs to stockout",
-    impact: "+₹48,000 protected revenue"
+    title: "Catalog Multi-Size Pricing & SKU Management",
+    description: "Every fragrance listed supports multiple bottle sizes (3ml, 6ml, 12ml, 25ml, 50ml, 100ml) with independent pricing, compare-at discounts, and stock levels.",
+    recommendedAction: "Review catalog products and configure size variants in the Products tab.",
+    actionButtonLabel: "Manage Products",
+    actionTarget: "/admin/products",
+    metric: "Multi-size enabled",
+    impact: "Maximizes AOV"
   },
   {
-    id: "ins-2",
+    id: "ins-google",
     type: "OPPORTUNITY",
     category: "Marketing",
-    title: "High Cart Cross-Sell Affinity: White Oudh + Sabaya",
-    description: "Data shows that 68% of customers who purchase White Oudh also view Sabaya within 7 days. Creating a dual 'His & Her Royal Attar' bundle discount can boost AOV by +₹1,200.",
-    recommendedAction: "Publish a 'Royal Couple Attar Set' coupon or homepage offer at ₹2,499 (10% bundled discount).",
-    actionButtonLabel: "Create Coupon Offer",
-    actionTarget: "/admin/coupons",
-    metric: "+₹1,200 AOV lift",
-    impact: "+22% basket size"
-  },
-  {
-    id: "ins-3",
-    type: "CRITICAL",
-    category: "Conversion",
-    title: "18 Abandoned High-Value Carts (₹48,200 Total)",
-    description: "18 customers added premium fragrances (Purple Oud & Khmrah) in the past 24 hours but stopped at the shipping step. Most are from Metro Mumbai.",
-    recommendedAction: "Review abandoned carts to identify high-dropoff products and adjust free shipping threshold.",
-    actionButtonLabel: "Review Abandoned Carts",
-    actionTarget: "/admin/abandoned-carts",
-    metric: "₹48,200 at stake",
-    impact: "18 sessions analyzed"
-  },
-  {
-    id: "ins-4",
-    type: "MEDIUM",
-    category: "Customer",
-    title: "Returning VIP Loyalty Velocity",
-    description: "VIP customers (Farhan Ansari, Vikram Malhotra, etc.) now represent 41% of monthly store revenue while making up only 8% of customer count.",
-    recommendedAction: "Issue exclusive store discount codes for returning VIPs to boost retention and lifetime value.",
-    actionButtonLabel: "View VIP Segment",
-    actionTarget: "/admin/customers",
-    metric: "41% revenue share",
-    impact: "+92% retention rate"
+    title: "Google Shopping & Merchant Center Synchronization",
+    description: "Your dynamic RSS 2.0 XML product feed publishes every sellable size variant to Google Shopping in compliance with Indian INR pricing specifications.",
+    recommendedAction: "Check feed readiness scores and verify variant IDs in the Google Shopping tab.",
+    actionButtonLabel: "View Shopping Feed",
+    actionTarget: "/admin/google-shopping",
+    metric: "Dynamic XML active",
+    impact: "Pan-India reach"
   }
 ];
 
@@ -71,28 +48,72 @@ export function getAIStoreResponse(query: string): {
 } {
   const q = query.toLowerCase();
 
-  if (q.includes("promote") || q.includes("focus") || q.includes("today")) {
+  if (q.includes("variant") || q.includes("size") || q.includes("add product") || q.includes("price")) {
     return {
-      answer: "Based on real-time traffic and seasonal monsoon demand in Mumbai, I recommend promoting **Ameer Al Oudh Bakhoor** and **Ocean Blue Perfume**. Ocean Blue is seeing a 42% surge in male buyer searches, while Bakhoor incense usage peaks during the festive & evening hours. Featuring these on your homepage hero can yield an estimated +18% conversion lift.",
+      answer: "To add **multi-size variants & size-specific pricing**:\n\n1. Go to [Products](/admin/products) and click **Add New Fragrance**.\n2. In the **Product Sizes & Size-Specific Pricing** section, choose standard presets (e.g. `3ml, 6ml, 12ml` for Attars or `30ml, 50ml, 100ml` for Perfumes).\n3. Enter individual **Selling Price (₹)**, **Compare at Price (₹)**, and **Stock** for each size.\n4. Click **Set Default** on the primary size you wish to feature on the storefront.\n5. Save the product to sync it live to your storefront and Google Shopping feed.",
       dataPoints: [
-        { label: "Top Trending Scent", value: "Ocean Blue (245 units)" },
-        { label: "Predicted Conversion Lift", value: "+18.4%" },
-        { label: "Estimated Daily Revenue", value: "₹45,000 - ₹62,000" }
+        { label: "Variant Support", value: "3ml to 100ml" },
+        { label: "Price Control", value: "Per-size Independent" },
+        { label: "Google Feed Sync", value: "Automatic" }
       ],
       suggestedAction: {
-        label: "Create Coupon Offer",
-        href: "/admin/coupons"
+        label: "Go to Products",
+        href: "/admin/products"
       }
     };
   }
 
-  if (q.includes("why") || q.includes("sales fall") || q.includes("conversion")) {
+  if (q.includes("category") || q.includes("photo") || q.includes("cover") || q.includes("image")) {
     return {
-      answer: "Yesterday's slight revenue dip (-4.2%) was primarily due to 2 out-of-stock SKUs (**Royal Oud** and **Khmrah 12ml**) which usually account for 14% of gross volume. Checkout page bounce rates increased from 18% to 29% when visitors saw 'Out of Stock' badges. Restocking these immediately will restore standard baseline revenue.",
+      answer: "To manage **Fragrance Categories & Cover Photos**:\n\n1. Navigate to [Categories](/admin/categories).\n2. When adding or editing a category, use the **Upload Category Cover Photo** dropzone to drag & drop or upload luxury imagery.\n3. The table displays a thumbnail preview and photo status badge (`Photo Active` in emerald or `No Photo` in amber).\n4. Category photos automatically update across your homepage grid and navigation menus.",
       dataPoints: [
-        { label: "Lost Opportunity Revenue", value: "₹18,400" },
-        { label: "OOS Drop-off Rate", value: "29.1%" },
-        { label: "Active Demand Waiting", value: "34 back-in-stock alerts" }
+        { label: "Supported Formats", value: "JPG, PNG, WEBP" },
+        { label: "Recommended Ratio", value: "1:1 Square / 4:5" },
+        { label: "Active Sections", value: "Homepage & Menus" }
+      ],
+      suggestedAction: {
+        label: "Manage Categories",
+        href: "/admin/categories"
+      }
+    };
+  }
+
+  if (q.includes("order") || q.includes("invoice") || q.includes("fulfill") || q.includes("shipping")) {
+    return {
+      answer: "To process **Customer Orders & Invoices**:\n\n1. Visit [Orders](/admin/orders).\n2. Filter orders by status: `New`, `Confirmed`, `Processing`, `Packed`, `Shipped`, or `Delivered`.\n3. Click on any Order ID to view customer delivery details, selected bottle sizes, and payment method.\n4. Generate and print GST-compliant tax invoices with 1 click.\n5. Update tracking numbers for BlueDart or Delhivery dispatch.",
+      dataPoints: [
+        { label: "Order Pipeline", value: "Real-time Synced" },
+        { label: "Invoicing", value: "Printable PDF" },
+        { label: "Courier Integration", value: "BlueDart / Delhivery" }
+      ],
+      suggestedAction: {
+        label: "View Orders",
+        href: "/admin/orders"
+      }
+    };
+  }
+
+  if (q.includes("google") || q.includes("feed") || q.includes("merchant")) {
+    return {
+      answer: "To inspect your **Google Shopping Feed**:\n\n1. Go to [Google Shopping Feed](/admin/google-shopping).\n2. Review the live readiness counters (Ready %, Missing SKU, Out of Stock).\n3. Use the filterable audit table to verify each variant before exporting.\n4. Click the code icon on any item to preview its exact `<item>` XML snippet.\n5. Copy your live feed URL (`https://snattarwala.in/feeds/google-shopping.xml`) and register it in Google Merchant Center.",
+      dataPoints: [
+        { label: "Feed Format", value: "RSS 2.0 / Google XML" },
+        { label: "Currency", value: "INR (Indian Rupee)" },
+        { label: "Update Frequency", value: "Live / Scheduled Daily" }
+      ],
+      suggestedAction: {
+        label: "Open Shopping Dashboard",
+        href: "/admin/google-shopping"
+      }
+    };
+  }
+
+  if (q.includes("stock") || q.includes("inventory") || q.includes("reorder")) {
+    return {
+      answer: "To track **Inventory & Reorder Levels**:\n\n1. Open [Inventory](/admin/inventory).\n2. Review items flagged as `Low Stock` or `Out of Stock`.\n3. Update unit counts or reorder thresholds directly.\n4. Stock counts sync immediately to customer cart checks and Google Shopping availability.",
+      dataPoints: [
+        { label: "Stock Sync", value: "Real-Time" },
+        { label: "Out of Stock Rule", value: "Prevents Overselling" }
       ],
       suggestedAction: {
         label: "Manage Inventory",
@@ -101,77 +122,17 @@ export function getAIStoreResponse(query: string): {
     };
   }
 
-  if (q.includes("best") || q.includes("top selling") || q.includes("bestseller")) {
-    return {
-      answer: "Your #1 best-selling product this month is **CR7 Perfume** (310 units, ₹7,75,000), followed closely by **White Oudh Attar** (384 units, ₹5,76,000) and **Ameer Al Oudh Bakhoor** (324 units, ₹5,83,200). Together, these 3 SKUs generate 54.8% of your store's total gross income.",
-      dataPoints: [
-        { label: "#1 Best Seller", value: "CR7 Perfume (₹7.75L)" },
-        { label: "#2 Best Seller", value: "Ameer Al Oudh (₹5.83L)" },
-        { label: "Concentration Ratio", value: "54.8% of Total" }
-      ],
-      suggestedAction: {
-        label: "View Product Analytics",
-        href: "/admin/analytics"
-      }
-    };
-  }
-
-  if (q.includes("stock") || q.includes("inventory") || q.includes("low")) {
-    return {
-      answer: "There are currently **3 critical low stock products**: **Ameer Al Oudh Bakhoor** (5 units left, ~36 hours remaining), **Purple Oud Perfume** (6 units left, ~4 days remaining), and **Khmrah Attar** (8 units left, ~5 days remaining). Total restock PO capital required is ₹32,400.",
-      dataPoints: [
-        { label: "Immediate Restock SKUs", value: "3 Products" },
-        { label: "Capital Needed", value: "₹32,400" },
-        { label: "Expected Gross Return", value: "₹94,800" }
-      ],
-      suggestedAction: {
-        label: "Initiate Restock PO",
-        href: "/admin/inventory"
-      }
-    };
-  }
-
-  if (q.includes("bundle") || q.includes("average order") || q.includes("aov")) {
-    return {
-      answer: "To increase your Average Order Value from ₹1,742 to ₹2,200+, implement a 3-tier 'Master Perfumer Discovery Trio' (6ml White Oudh + 50g Ameer Al Oudh + 50ml Ocean Blue) priced at ₹5,499. Customers frequently add incense alongside pure attars.",
-      dataPoints: [
-        { label: "Current AOV", value: "₹1,742" },
-        { label: "Target AOV", value: "₹2,250" },
-        { label: "Projected Gross Margin", value: "62.4%" }
-      ],
-      suggestedAction: {
-        label: "Build Discovery Bundle",
-        href: "/admin/products"
-      }
-    };
-  }
-
-  if (q.includes("eid") || q.includes("campaign") || q.includes("marketing") || q.includes("discount") || q.includes("offer")) {
-    return {
-      answer: "For your upcoming **Eid / Festive Promotion**, I recommend creating an exclusive promotional coupon 'EID2026' (15% off over ₹2,500) and announcing it on the homepage promotional bar. You can also offer a complimentary 3ml Royal Amber sample with all orders above ₹4,000.",
-      dataPoints: [
-        { label: "Recommended Promo Code", value: "EID2026" },
-        { label: "Projected Promotion Revenue", value: "₹3,40,000" },
-        { label: "Discount Tier", value: "15% off orders > ₹2,500" }
-      ],
-      suggestedAction: {
-        label: "Create Eid Coupon",
-        href: "/admin/coupons"
-      }
-    };
-  }
-
-  // Default intelligent analysis
+  // Default intelligent assistant response
   return {
-    answer: `Store health is strong today. Revenue stands at **₹8,45,280** (+18.4% vs last period) with **1,284 total orders**. Customer lifetime value across Mumbai, Pune, and Hyderabad has expanded by +9.8%. Focus on recovering the 18 abandoned carts (₹48,200) and restock Ameer Al Oudh Bakhoor before tonight's peak shopping hours.`,
+    answer: "Salam Admin! I am your live **SN AttarWala Business Advisor & Operations Co-Pilot**.\n\nI monitor your store's live Supabase database, variant inventory, order fulfillment, and Google Shopping feed.\n\nYou can ask me about:\n• Adding products with multi-size variants & prices\n• Uploading category photos\n• Processing pending orders & invoices\n• Managing wholesale inquiries\n• Optimizing average order value (AOV)",
     dataPoints: [
-      { label: "Today's Gross Sales", value: "₹8,45,280" },
-      { label: "Cart Recovery Opportunity", value: "₹48,200" },
-      { label: "Store Conversion Rate", value: "3.8%" }
+      { label: "Database", value: "Connected to Supabase" },
+      { label: "Google Feed", value: "Live Dynamic XML" },
+      { label: "AI Engine", value: "Active & Real-Time" }
     ],
     suggestedAction: {
-      label: "View Executive Dashboard",
-      href: "/admin"
+      label: "Go to Products",
+      href: "/admin/products"
     }
   };
 }

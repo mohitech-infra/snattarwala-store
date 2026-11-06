@@ -257,7 +257,7 @@ Your core mission:
         });
 
         const groqResult = await streamText({
-          model: groq('llama-3.3-70b-versatile'),
+          model: groq('openai/gpt-oss-20b'),
           system: systemPrompt,
           messages,
           maxSteps: 3,

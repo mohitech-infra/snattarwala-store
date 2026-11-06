@@ -14,7 +14,8 @@ import {
   DollarSign, 
   Flame,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  ShoppingBag
 } from "lucide-react"
 import Link from "next/link"
 import { getAIStoreResponse } from "@/lib/admin-ai"
@@ -35,25 +36,84 @@ interface Message {
 
 export function AIChatDrawer({ isOpen, onClose }: AIChatDrawerProps) {
   const [input, setInput] = useState("")
+  const [liveCounts, setLiveCounts] = useState<{
+    products: number;
+    lowStock: number;
+    pendingOrders: number;
+    abandonedCarts: number;
+    customers: number;
+    activeCoupons: number;
+  }>({
+    products: 0,
+    lowStock: 0,
+    pendingOrders: 0,
+    abandonedCarts: 0,
+    customers: 0,
+    activeCoupons: 0,
+  })
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "msg-0",
       sender: "ai",
-      text: "Salam SN Attarwala! I am your **ATTARWALA AI Advisor**. I continuously monitor your orders, inventory velocity, customer cart drops, and fragrance trends. How can I help you grow store revenue today?",
+      text: "Salam SN Attarwala! I am your **ATTARWALA AI Advisor**.\n\nI monitor your store's live Supabase database, variant inventory, order pipeline, and Google Shopping feed in real time. How can I help you grow store revenue today?",
       dataPoints: [
-        { label: "Today's Revenue", value: "₹8,45,280 (+18.4%)" },
-        { label: "Critical Warnings", value: "3 SKUs Low Stock" },
-        { label: "Recovery Potential", value: "18 Carts (₹48,200)" }
+        { label: "Catalog Products", value: "0 SKUs" },
+        { label: "Low Stock Warnings", value: "0 Items" },
+        { label: "Pending Orders", value: "0 New" },
+        { label: "System Status", value: "Live Database Connected" }
       ],
       suggestedAction: {
-        label: "Review Low Stock Products",
-        href: "/admin/inventory"
+        label: "Manage Products & Variants",
+        href: "/admin/products"
       },
       time: "Just now"
     }
   ])
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch real live store counts whenever drawer opens
+  useEffect(() => {
+    if (!isOpen) return
+
+    fetch("/api/admin/counts")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.counts) {
+          const counts = data.counts
+          setLiveCounts(counts)
+
+          // Update greeting with real-time numbers
+          setMessages((prev) => {
+            if (prev.length > 1) return prev // keep conversation history if user has chatted
+
+            const initialGreeting: Message = {
+              id: "msg-0",
+              sender: "ai",
+              text: "Salam SN Attarwala! I am your **ATTARWALA AI Advisor**.\n\nI monitor your store's live Supabase database, variant inventory, order pipeline, and Google Shopping feed in real time. How can I help you grow store revenue today?",
+              dataPoints: [
+                { label: "Catalog Products", value: `${counts.products} SKUs` },
+                { label: "Low Stock Warnings", value: `${counts.lowStock} Items` },
+                { label: "Pending Orders", value: `${counts.pendingOrders} New` },
+                { label: "Abandoned Carts", value: `${counts.abandonedCarts} Sessions` },
+              ],
+              suggestedAction:
+                counts.products === 0
+                  ? { label: "Add Your First Fragrance", href: "/admin/products" }
+                  : counts.lowStock > 0
+                  ? { label: "Review Low Stock Products", href: "/admin/inventory" }
+                  : counts.pendingOrders > 0
+                  ? { label: "Review Pending Orders", href: "/admin/orders" }
+                  : { label: "Explore Google Shopping Feed", href: "/admin/google-shopping" },
+              time: "Just now",
+            }
+            return [initialGreeting]
+          })
+        }
+      })
+      .catch((err) => console.warn("Could not fetch live counts for AI Advisor:", err))
+  }, [isOpen])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -64,7 +124,7 @@ export function AIChatDrawer({ isOpen, onClose }: AIChatDrawerProps) {
     { label: "How do I upload category photos?", icon: Flame },
     { label: "How to increase average order value?", icon: DollarSign },
     { label: "How to process pending orders & invoices?", icon: TrendingUp },
-    { label: "Suggest an Eid festive promotion", icon: TicketPercent },
+    { label: "How do I check my Google Shopping feed?", icon: ShoppingBag },
     { label: "How do I manage wholesale B2B leads?", icon: Users }
   ]
 
@@ -142,7 +202,7 @@ export function AIChatDrawer({ isOpen, onClose }: AIChatDrawerProps) {
         }
       }
     } catch (err) {
-      console.warn("Live AI streaming failed, falling back to store response:", err)
+      console.warn("Live AI streaming failed, falling back to dynamic store intelligence:", err)
       const fallback = getAIStoreResponse(query)
       setMessages(prev => [
         ...prev,
@@ -277,7 +337,7 @@ export function AIChatDrawer({ isOpen, onClose }: AIChatDrawerProps) {
             {isTyping && (
               <div className="flex items-center space-x-2 text-accent text-xs">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span className="italic font-light">Analyzing live store metrics & inventory...</span>
+                <span className="italic font-light">Analyzing live store metrics & formulating advice...</span>
               </div>
             )}
             <div ref={messagesEndRef} />

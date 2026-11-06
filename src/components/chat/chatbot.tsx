@@ -136,7 +136,13 @@ export function Chatbot() {
   const pathname = usePathname()
   const isAdmin = pathname?.startsWith("/admin") ?? false
 
-  return <ChatbotInner key={isAdmin ? "admin-mode" : "customer-mode"} isAdmin={isAdmin} />
+  // Remove the floating AI Copilot button on all admin pages.
+  // The Admin panel has its dedicated, live AI Advisor in the header and sidebar.
+  if (isAdmin) {
+    return null
+  }
+
+  return <ChatbotInner isAdmin={false} />
 }
 
 function ChatbotInner({ isAdmin }: { isAdmin: boolean }) {

@@ -41,3 +41,4 @@ UNION ALL
 SELECT 'orders', count(*) FROM public.orders
 UNION ALL
 SELECT 'order_items', count(*) FROM public.order_items;
+
