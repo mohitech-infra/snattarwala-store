@@ -61,6 +61,26 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
+                  // Suppress unhandled errors from buggy Chrome extensions (Urban VPN, coupon tools, etc.)
+                  window.addEventListener('error', function(event) {
+                    var filename = (event && (event.filename || '')) || '';
+                    var message = (event && (event.message || '')) || '';
+                    if (filename.includes('chrome-extension://') || message.includes('M_ID')) {
+                      event.preventDefault();
+                      event.stopImmediatePropagation();
+                      return true;
+                    }
+                  }, true);
+
+                  window.addEventListener('unhandledrejection', function(event) {
+                    var reason = event && event.reason;
+                    var stack = (reason && (reason.stack || reason.message || '')) || '';
+                    if (stack.includes('chrome-extension://') || stack.includes('M_ID')) {
+                      event.preventDefault();
+                      event.stopImmediatePropagation();
+                    }
+                  }, true);
+
                   var clean = function(el) {
                     if (el && el.removeAttribute) {
                       if (el.hasAttribute('bis_skin_checked')) el.removeAttribute('bis_skin_checked');
