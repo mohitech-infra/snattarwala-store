@@ -270,7 +270,7 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
   const navSections = allNavSections.filter(section => section.allowedRoles.includes(userRole))
 
   return (
-    <aside className="w-72 bg-card border-r border-border/50 flex flex-col shrink-0 h-full overflow-hidden select-none">
+    <aside suppressHydrationWarning className="w-72 bg-card border-r border-border/50 flex flex-col shrink-0 h-full overflow-hidden select-none">
       {/* Brand Header */}
       <div className="px-4 py-3 border-b border-border/50 bg-background/50 flex items-center justify-between">
         <Link href="/admin" className="flex items-center space-x-3 group">

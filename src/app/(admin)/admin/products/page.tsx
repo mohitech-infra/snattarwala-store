@@ -414,6 +414,7 @@ function ProductVariantsEditor({
 }
 
 export default function AdminProductsPage() {
+  const [mounted, setMounted] = useState(false)
   const [products, setProducts] = useState<AdminProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -430,6 +431,7 @@ export default function AdminProductsPage() {
   }
 
   useEffect(() => {
+    setMounted(true)
     loadProducts()
   }, [])
 
@@ -629,8 +631,56 @@ export default function AdminProductsPage() {
     }
   }
 
+  if (!mounted) {
+    return (
+      <div className="space-y-6" suppressHydrationWarning>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-6">
+          <div>
+            <span className="text-xs uppercase tracking-widest font-semibold text-accent block mb-1">
+              Shop Catalog
+            </span>
+            <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
+              Fragrance Products
+            </h1>
+            <p className="text-sm text-foreground/60">
+              Manage your perfumes, pure attars, bakhoor incense, notes, and multi-tier pricing.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-32 bg-secondary/60 rounded-sm animate-pulse" />
+            <div className="h-9 w-36 bg-accent/20 rounded-sm animate-pulse" />
+          </div>
+        </div>
+
+        {/* Tab Skeleton */}
+        <div className="flex items-center gap-2 border-b border-border/40 pb-2">
+          <div className="h-8 w-24 bg-secondary/50 rounded-sm animate-pulse" />
+          <div className="h-8 w-24 bg-secondary/50 rounded-sm animate-pulse" />
+          <div className="h-8 w-28 bg-secondary/50 rounded-sm animate-pulse" />
+        </div>
+
+        {/* Cards Skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-20 bg-card border border-border/50 rounded-sm p-4 animate-pulse flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-secondary rounded-sm" />
+                <div className="space-y-2">
+                  <div className="h-4 w-40 bg-secondary rounded" />
+                  <div className="h-3 w-24 bg-secondary/70 rounded" />
+                </div>
+              </div>
+              <div className="h-6 w-20 bg-secondary rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-6">

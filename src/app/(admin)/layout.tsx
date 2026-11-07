@@ -30,13 +30,13 @@ export default function AdminRootLayout({
     <div suppressHydrationWarning className="h-screen flex bg-background text-foreground overflow-hidden selection:bg-accent selection:text-slate-950">
       
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block shrink-0 h-full">
+      <div suppressHydrationWarning className="hidden lg:block shrink-0 h-full">
         <AdminSidebar onOpenAI={() => setIsAIOpen(true)} />
       </div>
 
       {/* Mobile Drawer Sidebar */}
       {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div suppressHydrationWarning className="fixed inset-0 z-50 lg:hidden">
           <div 
             onClick={() => setIsMobileSidebarOpen(false)}
             className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" 
@@ -56,7 +56,7 @@ export default function AdminRootLayout({
       )}
 
       {/* Main Content Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto custom-scrollbar" data-lenis-prevent>
+      <div suppressHydrationWarning className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto custom-scrollbar" data-lenis-prevent>
         <AdminHeader 
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onOpenAI={() => setIsAIOpen(true)}
@@ -65,7 +65,7 @@ export default function AdminRootLayout({
           setTimeRange={setTimeRange}
         />
 
-        <main className="flex-1 p-6 md:p-8 lg:p-10 max-w-[1600px] w-full mx-auto space-y-8">
+        <main suppressHydrationWarning className="flex-1 p-6 md:p-8 lg:p-10 max-w-[1600px] w-full mx-auto space-y-8">
           {children}
         </main>
       </div>

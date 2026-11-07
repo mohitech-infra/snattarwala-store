@@ -56,6 +56,45 @@ export default function RootLayout({
       <head>
         <link rel="preload" as="image" href="/logo.png" type="image/png" fetchPriority="high" />
         <link rel="preload" as="image" href="/hero-poster.webp" type="image/webp" fetchPriority="high" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var clean = function(el) {
+                    if (el && el.removeAttribute) {
+                      if (el.hasAttribute('bis_skin_checked')) el.removeAttribute('bis_skin_checked');
+                      if (el.hasAttribute('bis_register')) el.removeAttribute('bis_register');
+                    }
+                  };
+                  var observer = new MutationObserver(function(mutations) {
+                    for (var i = 0; i < mutations.length; i++) {
+                      var m = mutations[i];
+                      if (m.type === 'attributes' && (m.attributeName === 'bis_skin_checked' || m.attributeName === 'bis_register')) {
+                        clean(m.target);
+                      } else if (m.type === 'childList') {
+                        for (var j = 0; j < m.addedNodes.length; j++) {
+                          var node = m.addedNodes[j];
+                          if (node.nodeType === 1) {
+                            clean(node);
+                            var children = node.querySelectorAll ? node.querySelectorAll('[bis_skin_checked], [bis_register]') : [];
+                            for (var k = 0; k < children.length; k++) clean(children[k]);
+                          }
+                        }
+                      }
+                    }
+                  });
+                  observer.observe(document.documentElement, {
+                    subtree: true,
+                    attributes: true,
+                    childList: true,
+                    attributeFilter: ['bis_skin_checked', 'bis_register']
+                  });
+                } catch(e) {}
+              })();
+            `
+          }}
+        />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col font-sans">
         <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />

@@ -110,9 +110,9 @@ export function AdminHeader({
   const unreadCount = notifications.filter(n => n.unread).length
 
   return (
-    <header className="h-20 bg-card border-b border-border/50 px-6 md:px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm backdrop-blur-md bg-card/95">
+    <header suppressHydrationWarning className="h-20 bg-card border-b border-border/50 px-6 md:px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm backdrop-blur-md bg-card/95">
       {/* Left: Mobile Toggle & Global Search */}
-      <div className="flex items-center space-x-4 flex-1 max-w-xl">
+      <div suppressHydrationWarning className="flex items-center space-x-4 flex-1 max-w-xl">
         <button
           onClick={onOpenMobileSidebar}
           className="lg:hidden p-2 rounded-sm border border-border text-foreground hover:bg-secondary transition-colors"
@@ -123,10 +123,11 @@ export function AdminHeader({
 
         {/* Global Search Bar */}
         <div 
+          suppressHydrationWarning
           onClick={onOpenSearch}
           className="relative w-full max-w-md cursor-pointer group"
         >
-          <div className="flex items-center w-full bg-background border border-border/70 group-hover:border-accent rounded-sm py-2.5 pl-10 pr-4 text-xs text-foreground/60 transition-all shadow-sm">
+          <div suppressHydrationWarning className="flex items-center w-full bg-background border border-border/70 group-hover:border-accent rounded-sm py-2.5 pl-10 pr-4 text-xs text-foreground/60 transition-all shadow-sm">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground/40 group-hover:text-accent transition-colors" />
             <span className="truncate">Search products, orders, customers, SKUs...</span>
             <kbd className="ml-auto hidden sm:inline-flex items-center gap-0.5 text-[10px] font-mono bg-secondary px-2 py-0.5 rounded border border-border text-foreground/60">
