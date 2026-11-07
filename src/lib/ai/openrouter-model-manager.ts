@@ -56,10 +56,7 @@ function writeCache(cache: ModelCache) {
  * Returns the OpenRouter API key from environment variables with fallback
  */
 export function getOpenRouterApiKey(): string {
-  return (
-    process.env.OPENROUTER_API_KEY ||
-    "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"
-  )
+  return process.env.OPENROUTER_API_KEY || ""
 }
 
 /**
