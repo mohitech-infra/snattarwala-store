@@ -349,7 +349,25 @@ export async function createAdminProduct(productData: Partial<AdminProduct>): Pr
 
   const supabase = createClient()
   try {
-    const slug = productData.slug || (productData.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+    const baseSlug = (productData.slug || productData.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "fragrance"
+    let slug = baseSlug
+
+    // Check for existing slug to prevent duplicate key constraint
+    const { data: existingSlugs } = await supabase
+      .from("products")
+      .select("slug")
+      .ilike("slug", `${baseSlug}%`)
+
+    if (existingSlugs && existingSlugs.length > 0) {
+      const slugSet = new Set(existingSlugs.map((s: any) => (s.slug || "").toLowerCase()))
+      if (slugSet.has(slug.toLowerCase())) {
+        let counter = 2
+        while (slugSet.has(`${baseSlug}-${counter}`)) {
+          counter++
+        }
+        slug = `${baseSlug}-${counter}`
+      }
+    }
     const categoryName = (productData.category && typeof productData.category === "string" && productData.category.trim())
       ? productData.category.trim()
       : "Attars"

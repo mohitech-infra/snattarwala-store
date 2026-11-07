@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
 
     const category = (body.category && typeof body.category === "string" && body.category.trim()) ? body.category.trim() : "Attars"
-    const slug = body.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+    const baseSlug = (body.slug || name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "fragrance"
     const sku = (body.sku && typeof body.sku === "string" && body.sku.trim()) 
       ? body.sku.trim() 
       : `SNA-${name.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`
@@ -69,6 +69,24 @@ export async function POST(req: NextRequest) {
     const baseNotes = Array.isArray(body.notes?.base) ? body.notes.base.join(", ") : (body.base_notes || "Oud")
 
     const supabase = getSupabase()
+
+    // Ensure unique slug to prevent "duplicate key value violates unique constraint products_slug_key"
+    let slug = baseSlug
+    const { data: existingSlugs } = await supabase
+      .from("products")
+      .select("slug")
+      .ilike("slug", `${baseSlug}%`)
+
+    if (existingSlugs && existingSlugs.length > 0) {
+      const slugSet = new Set(existingSlugs.map((s: any) => (s.slug || "").toLowerCase()))
+      if (slugSet.has(slug.toLowerCase())) {
+        let counter = 2
+        while (slugSet.has(`${baseSlug}-${counter}`)) {
+          counter++
+        }
+        slug = `${baseSlug}-${counter}`
+      }
+    }
 
     // Process and normalize product sizes & variant pricing
     let variants = Array.isArray(body.variants) && body.variants.length > 0 ? body.variants : []
@@ -131,6 +149,14 @@ export async function POST(req: NextRequest) {
     // If 'series' column is not yet added to the schema, gracefully retry without it (series is preserved in tags)
     if (error && error.message?.includes("series")) {
       delete insertPayload.series
+      const retry = await supabase.from("products").insert(insertPayload).select().single()
+      newProd = retry.data
+      error = retry.error
+    }
+
+    // If duplicate slug constraint occurs, append a unique random suffix and retry
+    if (error && (error.message?.includes("products_slug_key") || error.message?.includes("unique constraint"))) {
+      insertPayload.slug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`
       const retry = await supabase.from("products").insert(insertPayload).select().single()
       newProd = retry.data
       error = retry.error

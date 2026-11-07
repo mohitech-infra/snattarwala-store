@@ -26,6 +26,7 @@ import {
 import { getAdminProducts, createAdminProduct, deleteAdminProduct, updateAdminProduct, clearAllAdminProducts, AdminProduct } from "@/lib/admin-service"
 import { ExportMenu } from "@/components/admin/export-menu"
 import { ProductGalleryUploader } from "@/components/admin/product-gallery-uploader"
+import { compressImageFile } from "@/lib/image-compressor"
 
 interface VariantItem {
   size: string
@@ -435,8 +436,9 @@ function ProductVariantsEditor({
                                 if (!file) return
                                 try {
                                   setIsUploadingBottlePhoto(true)
+                                  const compressed = await compressImageFile(file, 1000, 0.82)
                                   const formData = new FormData()
-                                  formData.append("file", file)
+                                  formData.append("file", compressed)
                                   const res = await fetch("/api/admin/upload", { method: "POST", body: formData })
                                   const data = await res.json()
                                   if (data.success && data.url) {
