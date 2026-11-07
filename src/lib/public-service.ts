@@ -1,9 +1,11 @@
 import { createClient } from "./supabase/client"
 import { DUMMY_PRODUCTS } from "./products"
+import { getDefaultBottleType } from "./bottle-types"
 
 export interface ProductVariant {
   id?: string
   size: string
+  bottleType?: string
   price: number
   compareAtPrice?: number | null
   stock?: number
@@ -123,10 +125,12 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
 
       // Parse and normalize variants
       let variants: ProductVariant[] = []
+      const categoryName = p.category?.name || p.category || "Attars"
       if (Array.isArray(p.variants) && p.variants.length > 0) {
         variants = p.variants.map((v: any, idx: number) => ({
           id: v.id,
           size: v.size || "Standard",
+          bottleType: v.bottleType || v.bottle_type || getDefaultBottleType(categoryName, v.size),
           price: Number(v.price) || Number(p.price),
           compareAtPrice: v.compareAtPrice !== undefined ? Number(v.compareAtPrice) : (v.compare_at_price !== undefined ? Number(v.compare_at_price) : (p.compare_at_price ? Number(p.compare_at_price) : null)),
           stock: v.stock !== undefined ? Number(v.stock) : (v.stock_quantity !== undefined ? Number(v.stock_quantity) : Number(p.stock_quantity) || 0),
@@ -136,6 +140,7 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
       } else if (p.size) {
         variants = p.size.split(",").map((s: string, idx: number) => ({
           size: s.trim(),
+          bottleType: getDefaultBottleType(categoryName, s.trim()),
           price: Number(p.price),
           compareAtPrice: p.compare_at_price ? Number(p.compare_at_price) : null,
           stock: Number(p.stock_quantity) || 0,

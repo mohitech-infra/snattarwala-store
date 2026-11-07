@@ -26,7 +26,7 @@ export interface AdminProduct {
   reviewsCount: number
   status: "Active" | "Draft" | "Low Stock" | "Out of Stock"
   imageUrl: string
-  variants: { size: string; sku?: string; price: number; stock: number; compareAtPrice?: number | null; isDefault?: boolean }[]
+  variants: { size: string; bottleType?: string; sku?: string; price: number; stock: number; compareAtPrice?: number | null; isDefault?: boolean }[]
   size?: string
   notes: { top: string[]; heart: string[]; base: string[] }
   isFeatured?: boolean
@@ -286,6 +286,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
         variants: Array.isArray(p.variants) && p.variants.length > 0
           ? p.variants.map((v: any, idx: number) => ({
               size: v.size || "Standard",
+              bottleType: v.bottleType || v.bottle_type || (p.fragrance_type?.includes("Attar") ? "Roll-On" : "Fine Mist Spray"),
               sku: v.sku || `${p.sku || 'SKU'}-${v.size || idx}`,
               price: Number(v.price) || Number(p.price) || 1500,
               compareAtPrice: v.compareAtPrice !== undefined ? Number(v.compareAtPrice) : (p.compare_at_price ? Number(p.compare_at_price) : undefined),
@@ -294,6 +295,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
             }))
           : (p.size ? p.size.split(",").map((s: string, idx: number) => ({
               size: s.trim(),
+              bottleType: p.fragrance_type?.includes("Attar") ? "Roll-On" : "Fine Mist Spray",
               sku: `${p.sku || 'SKU'}-${s.trim()}`,
               price: Number(p.price) || 1500,
               compareAtPrice: p.compare_at_price ? Number(p.compare_at_price) : undefined,

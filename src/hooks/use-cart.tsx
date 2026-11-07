@@ -11,6 +11,7 @@ export type CartItem = {
   imageUrl: string
   quantity: number
   size?: string
+  bottleType?: string
 }
 
 interface CartContextType {
@@ -52,7 +53,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addItem = (newItem: Omit<CartItem, "id">) => {
     setItems((currentItems) => {
       const existingItemIndex = currentItems.findIndex(
-        (item) => item.productId === newItem.productId && item.size === newItem.size
+        (item) => item.productId === newItem.productId && item.size === newItem.size && item.bottleType === newItem.bottleType
       )
 
       if (existingItemIndex > -1) {

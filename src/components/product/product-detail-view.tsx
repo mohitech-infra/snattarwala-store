@@ -8,6 +8,7 @@ import { FragranceNoteBadge } from "@/components/product/fragrance-note-badge"
 import { ProductCard } from "@/components/product/product-card"
 import { PublicProduct, ProductVariant } from "@/lib/public-service"
 import { StorePolicies, DEFAULT_STORE_POLICIES } from "@/lib/policies-service"
+import { getAvailableBottleTypes, getDefaultBottleType } from "@/lib/bottle-types"
 import { useRouter } from "next/navigation"
 
 interface ProductDetailViewProps {
@@ -44,7 +45,11 @@ export function ProductDetailView({
          (v.size && v.size.toLowerCase() === initialVariantSku?.toLowerCase())
   ) || variants.find(v => v.isDefault) || variants[0]
 
+  const availableBottleTypes = getAvailableBottleTypes(product.category)
   const [selectedSize, setSelectedSize] = useState<string>(matchedInitial?.size || product.sizes[0] || "")
+  const [selectedBottleType, setSelectedBottleType] = useState<string>(
+    matchedInitial?.bottleType || getDefaultBottleType(product.category, matchedInitial?.size)
+  )
   const [selectedImage, setSelectedImage] = useState<string>(product.imageUrl || "")
   const [quantity, setQuantity] = useState<number>(1)
   const [activeTab, setActiveTab] = useState<string>("description")
@@ -59,12 +64,18 @@ export function ProductDetailView({
       )
       if (match) {
         setSelectedSize(match.size)
+        if (match.bottleType) {
+          setSelectedBottleType(match.bottleType)
+        }
       }
     }
   }, [initialVariantSku, variants])
 
   // Active variant resolution for dynamic price, compare-at, and stock per size
-  const activeVariant = variants.find(v => v.size === selectedSize) || matchedInitial
+  const activeVariant = variants.find(v => v.size === selectedSize && (!v.bottleType || v.bottleType === selectedBottleType)) 
+    || variants.find(v => v.size === selectedSize) 
+    || matchedInitial
+
   const currentPrice = activeVariant ? activeVariant.price : product.price
   const currentCompareAtPrice = activeVariant?.compareAtPrice !== undefined && activeVariant.compareAtPrice !== null
     ? activeVariant.compareAtPrice
@@ -79,6 +90,9 @@ export function ProductDetailView({
   const handleSelectSize = (size: string) => {
     setSelectedSize(size)
     const v = variants.find(item => item.size === size)
+    if (v?.bottleType) {
+      setSelectedBottleType(v.bottleType)
+    }
     if (v && typeof window !== "undefined") {
       const url = new URL(window.location.href)
       url.searchParams.set("variant", v.sku || v.size)
@@ -94,7 +108,8 @@ export function ProductDetailView({
         price: currentPrice,
         imageUrl: product.imageUrl || "/placeholder.jpg",
         quantity,
-        size: selectedSize || product.sizes[0] || "Standard"
+        size: selectedSize || product.sizes[0] || "Standard",
+        bottleType: selectedBottleType
       })
       setIsCartOpen(false)
       router.push("/checkout")
@@ -262,6 +277,43 @@ export function ProductDetailView({
                 </div>
               )}
 
+              {/* Bottle Type Selection */}
+              {availableBottleTypes && availableBottleTypes.length > 0 && (
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-foreground/80">Select Bottle Type / Applicator</span>
+                    <span className="text-[11px] text-accent font-semibold">{selectedBottleType}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {availableBottleTypes.map((bt) => {
+                      const isSelected = selectedBottleType === bt.name
+                      return (
+                        <button
+                          key={bt.id}
+                          type="button"
+                          onClick={() => setSelectedBottleType(bt.name)}
+                          className={`p-3 border rounded-sm transition-all text-left flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-accent bg-accent/15 text-foreground ring-1 ring-accent font-bold shadow-sm'
+                              : 'border-border text-foreground/80 hover:border-accent/60 bg-secondary/20'
+                          }`}
+                        >
+                          <span className="text-xs font-bold tracking-wide uppercase flex items-center justify-between">
+                            <span>{bt.name}</span>
+                            {isSelected && <span className="text-[10px] text-accent">✓ Selected</span>}
+                          </span>
+                          {bt.description && (
+                            <span className="text-[11px] text-foreground/60 mt-1 line-clamp-2 font-normal leading-relaxed">
+                              {bt.description}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Status */}
               <div className="flex items-center space-x-2 text-sm">
                 <span className="uppercase tracking-widest text-[10px] font-semibold text-foreground/60">Availability:</span>
@@ -299,7 +351,8 @@ export function ProductDetailView({
                           price: currentPrice,
                           imageUrl: product.imageUrl || "/placeholder.jpg",
                           quantity,
-                          size: selectedSize || product.sizes[0] || "Standard"
+                          size: selectedSize || product.sizes[0] || "Standard",
+                          bottleType: selectedBottleType
                         })
                       }
                     }}

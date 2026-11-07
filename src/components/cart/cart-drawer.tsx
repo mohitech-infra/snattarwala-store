@@ -91,7 +91,11 @@ export function CartDrawer() {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                    {item.size && <p className="text-sm text-foreground/60">{item.size}</p>}
+                    {(item.size || item.bottleType) && (
+                      <p className="text-xs text-foreground/60 font-medium">
+                        {[item.size, item.bottleType].filter(Boolean).join(" • ")}
+                      </p>
+                    )}
                     
                     <div className="mt-auto flex items-center justify-between">
                       {/* Quantity Control */}

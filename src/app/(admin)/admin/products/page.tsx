@@ -28,6 +28,7 @@ import { ProductImageDropzone } from "@/components/admin/product-image-dropzone"
 
 interface VariantItem {
   size: string
+  bottleType?: string
   price: number
   compareAtPrice?: number | null
   stock: number
@@ -35,11 +36,38 @@ interface VariantItem {
   isDefault?: boolean
 }
 
-const CATEGORY_SIZE_PRESETS: Record<string, string[]> = {
-  "Attars": ["3ml", "6ml", "12ml", "25ml"],
-  "Perfumes": ["30ml", "50ml", "100ml"],
-  "Bakhoor": ["40g", "50g", "100g", "250g"]
+const CATEGORY_PRESET_VARIANTS: Record<string, { size: string; bottleType: string }[]> = {
+  "Attars": [
+    { size: "3ml", bottleType: "Roll-On" },
+    { size: "6ml", bottleType: "Roll-On" },
+    { size: "12ml", bottleType: "Roll-On" },
+    { size: "12ml", bottleType: "Glass Dipstick" },
+    { size: "25ml", bottleType: "Crystal Decanter" }
+  ],
+  "Perfumes": [
+    { size: "30ml", bottleType: "Pocket Atomizer" },
+    { size: "50ml", bottleType: "Fine Mist Spray" },
+    { size: "100ml", bottleType: "Fine Mist Spray" },
+    { size: "100ml", bottleType: "Luxury Decanter" }
+  ],
+  "Bakhoor": [
+    { size: "40g", bottleType: "Airtight Glass Jar" },
+    { size: "50g", bottleType: "Airtight Glass Jar" },
+    { size: "100g", bottleType: "Airtight Glass Jar" },
+    { size: "250g", bottleType: "Gold Velvet Box" }
+  ]
 }
+
+const COMMON_BOTTLE_TYPES = [
+  "Roll-On",
+  "Fine Mist Spray",
+  "Glass Dipstick",
+  "Pocket Atomizer",
+  "Crystal Decanter",
+  "Luxury Decanter",
+  "Airtight Glass Jar",
+  "Gold Velvet Box"
+]
 
 function ProductVariantsEditor({
   category,
@@ -55,33 +83,37 @@ function ProductVariantsEditor({
   onChange: (updated: VariantItem[]) => void
 }) {
   const [customSize, setCustomSize] = useState("")
-  const presets = CATEGORY_SIZE_PRESETS[category] || CATEGORY_SIZE_PRESETS["Attars"]
+  const [customBottleType, setCustomBottleType] = useState("Roll-On")
+  const presets = CATEGORY_PRESET_VARIANTS[category] || CATEGORY_PRESET_VARIANTS["Attars"]
   const currentVariants = Array.isArray(variants) ? variants : []
 
-  const handleAddPreset = (sizeName: string) => {
-    if (currentVariants.some(v => v.size.toLowerCase() === sizeName.toLowerCase())) return
+  const handleAddPreset = (preset: { size: string; bottleType: string }) => {
+    if (currentVariants.some(v => v.size.toLowerCase() === preset.size.toLowerCase() && (v.bottleType || "").toLowerCase() === preset.bottleType.toLowerCase())) return
 
     let price = basePrice || 1500
-    if (sizeName === "3ml") price = Math.round(price * 0.55)
-    else if (sizeName === "6ml") price = Math.round(price * 0.8)
-    else if (sizeName === "12ml") price = price
-    else if (sizeName === "25ml") price = Math.round(price * 1.85)
-    else if (sizeName === "30ml") price = Math.round(price * 0.65)
-    else if (sizeName === "50ml") price = Math.round(price * 0.85)
-    else if (sizeName === "100ml") price = price
-    else if (sizeName === "40g") price = Math.round(price * 0.8)
-    else if (sizeName === "50g") price = price
-    else if (sizeName === "100g") price = Math.round(price * 1.75)
-    else if (sizeName === "250g") price = Math.round(price * 3.8)
+    const s = preset.size
+    if (s === "3ml") price = Math.round(price * 0.55)
+    else if (s === "6ml") price = Math.round(price * 0.8)
+    else if (s === "12ml") price = price
+    else if (s === "25ml") price = Math.round(price * 1.85)
+    else if (s === "30ml") price = Math.round(price * 0.65)
+    else if (s === "50ml") price = Math.round(price * 0.85)
+    else if (s === "100ml") price = price
+    else if (s === "40g") price = Math.round(price * 0.8)
+    else if (s === "50g") price = price
+    else if (s === "100g") price = Math.round(price * 1.75)
+    else if (s === "250g") price = Math.round(price * 3.8)
 
     const cleanSku = (baseSku || "SNA").trim().toUpperCase()
-    const skuCode = `${cleanSku}-${sizeName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}`
+    const typeCode = preset.bottleType.slice(0, 3).toUpperCase()
+    const skuCode = `${cleanSku}-${s.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}-${typeCode}`
     const isFirst = currentVariants.length === 0
 
     onChange([
       ...currentVariants,
       {
-        size: sizeName,
+        size: preset.size,
+        bottleType: preset.bottleType,
         price,
         compareAtPrice: Math.round(price * 1.25),
         stock: 20,
@@ -92,21 +124,19 @@ function ProductVariantsEditor({
   }
 
   const handleAddCustom = () => {
-    const trimmed = customSize.trim()
-    if (!trimmed) return
-    if (currentVariants.some(v => v.size.toLowerCase() === trimmed.toLowerCase())) {
-      setCustomSize("")
-      return
-    }
+    const trimmedSize = customSize.trim()
+    if (!trimmedSize) return
     const cleanSku = (baseSku || "SNA").trim().toUpperCase()
-    const skuCode = `${cleanSku}-${trimmed.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}`
+    const typeCode = customBottleType.slice(0, 3).toUpperCase()
+    const skuCode = `${cleanSku}-${trimmedSize.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}-${typeCode}`
     const price = basePrice || 1500
     const isFirst = currentVariants.length === 0
 
     onChange([
       ...currentVariants,
       {
-        size: trimmed,
+        size: trimmedSize,
+        bottleType: customBottleType,
         price,
         compareAtPrice: Math.round(price * 1.25),
         stock: 20,
@@ -162,16 +192,19 @@ function ProductVariantsEditor({
       {/* 1-Click Quick Preset Pills */}
       <div>
         <span className="text-[10px] uppercase font-semibold tracking-wider text-foreground/60 block mb-1.5">
-          1-Click Preset Sizes for {category}:
+          1-Click Preset Sizes & Bottle Types for {category}:
         </span>
         <div className="flex flex-wrap items-center gap-2">
-          {presets.map((sizeName) => {
-            const isAdded = currentVariants.some(v => v.size.toLowerCase() === sizeName.toLowerCase())
+          {presets.map((preset) => {
+            const isAdded = currentVariants.some(
+              v => v.size.toLowerCase() === preset.size.toLowerCase() && 
+                   (v.bottleType || "").toLowerCase() === preset.bottleType.toLowerCase()
+            )
             return (
               <button
-                key={sizeName}
+                key={`${preset.size}-${preset.bottleType}`}
                 type="button"
-                onClick={() => handleAddPreset(sizeName)}
+                onClick={() => handleAddPreset(preset)}
                 disabled={isAdded}
                 className={`px-3 py-1 rounded text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 ${
                   isAdded
@@ -180,21 +213,30 @@ function ProductVariantsEditor({
                 }`}
               >
                 {isAdded ? <Check className="w-3 h-3 text-accent" /> : <Plus className="w-3 h-3" />}
-                <span>+ {sizeName}</span>
+                <span>+ {preset.size} ({preset.bottleType})</span>
               </button>
             )
           })}
 
           {/* Custom Size Form */}
-          <div className="flex items-center gap-1.5 sm:ml-auto w-full sm:w-auto mt-2 sm:mt-0">
+          <div className="flex items-center gap-1.5 sm:ml-auto w-full sm:w-auto mt-2 sm:mt-0 flex-wrap">
             <input
               type="text"
               value={customSize}
               onChange={(e) => setCustomSize(e.target.value)}
-              placeholder="Custom size (e.g. 15ml, 250g)"
-              className="bg-background border border-border rounded-sm py-1 px-2.5 text-xs text-foreground focus:outline-none focus:border-accent w-full sm:w-44"
+              placeholder="Size (e.g. 15ml, 250g)"
+              className="bg-background border border-border rounded-sm py-1 px-2.5 text-xs text-foreground focus:outline-none focus:border-accent w-28"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustom(); } }}
             />
+            <select
+              value={customBottleType}
+              onChange={(e) => setCustomBottleType(e.target.value)}
+              className="bg-background border border-border rounded-sm py-1 px-2 text-xs text-foreground focus:outline-none focus:border-accent"
+            >
+              {COMMON_BOTTLE_TYPES.map(bt => (
+                <option key={bt} value={bt}>{bt}</option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={handleAddCustom}
@@ -212,14 +254,14 @@ function ProductVariantsEditor({
           <p className="text-xs text-foreground/70 mb-1.5 font-bold">No sizes added yet.</p>
           <p className="text-[11px] text-foreground/50 mb-3">Click any quick preset size button above to configure your first size.</p>
           <div className="flex justify-center gap-2">
-            {presets.slice(0, 2).map((s) => (
+            {presets.slice(0, 2).map((p) => (
               <button
-                key={s}
+                key={`${p.size}-${p.bottleType}`}
                 type="button"
-                onClick={() => handleAddPreset(s)}
+                onClick={() => handleAddPreset(p)}
                 className="px-3 py-1.5 bg-accent text-slate-950 rounded text-xs font-bold uppercase tracking-wider hover:bg-accent/90 transition-colors"
               >
-                + Add {s}
+                + Add {p.size} ({p.bottleType})
               </button>
             ))}
           </div>
@@ -228,9 +270,10 @@ function ProductVariantsEditor({
         <div className="space-y-2.5">
           <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-wider text-foreground/50 px-2">
             <div className="col-span-2">Size Name</div>
+            <div className="col-span-2">Bottle Type</div>
             <div className="col-span-3">Selling Price (₹) *</div>
-            <div className="col-span-3">MRP (Compare ₹)</div>
-            <div className="col-span-2">Stock (Units)</div>
+            <div className="col-span-2">MRP (Compare ₹)</div>
+            <div className="col-span-1">Stock</div>
             <div className="col-span-2 text-right">Default / Remove</div>
           </div>
 
@@ -260,6 +303,20 @@ function ProductVariantsEditor({
                     />
                   </div>
 
+                  {/* Bottle Type */}
+                  <div className="sm:col-span-2 flex items-center gap-1.5">
+                    <span className="text-[10px] text-foreground/50 sm:hidden w-24">Bottle:</span>
+                    <select
+                      value={v.bottleType || "Roll-On"}
+                      onChange={(e) => handleUpdateVariant(idx, "bottleType", e.target.value)}
+                      className="w-full bg-background border border-border rounded-sm py-1.5 px-2 text-xs text-foreground focus:outline-none focus:border-accent"
+                    >
+                      {COMMON_BOTTLE_TYPES.map(bt => (
+                        <option key={bt} value={bt}>{bt}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Selling Price */}
                   <div className="sm:col-span-3 flex items-center gap-1.5">
                     <span className="text-[10px] text-foreground/50 sm:hidden w-24">Selling Price:</span>
@@ -277,7 +334,7 @@ function ProductVariantsEditor({
                   </div>
 
                   {/* Compare Price */}
-                  <div className="sm:col-span-3 flex items-center gap-1.5">
+                  <div className="sm:col-span-2 flex items-center gap-1.5">
                     <span className="text-[10px] text-foreground/50 sm:hidden w-24">MRP Price:</span>
                     <div className="relative w-full">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/50 text-xs">₹</span>
@@ -286,26 +343,26 @@ function ProductVariantsEditor({
                         min="0"
                         value={v.compareAtPrice || ""}
                         onChange={(e) => handleUpdateVariant(idx, "compareAtPrice", e.target.value ? Number(e.target.value) : null)}
-                        placeholder="MRP (Optional)"
+                        placeholder="MRP"
                         className="w-full bg-background border border-border rounded-sm py-1.5 pl-6 pr-2.5 text-xs text-foreground focus:outline-none focus:border-accent"
                       />
                       {discount > 0 && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-500">
-                          {discount}% off
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-500">
+                          {discount}%
                         </span>
                       )}
                     </div>
                   </div>
 
                   {/* Stock Quantity */}
-                  <div className="sm:col-span-2 flex items-center gap-1.5">
+                  <div className="sm:col-span-1 flex items-center gap-1.5">
                     <span className="text-[10px] text-foreground/50 sm:hidden w-24">Stock:</span>
                     <input
                       type="number"
                       min="0"
                       value={v.stock}
                       onChange={(e) => handleUpdateVariant(idx, "stock", Number(e.target.value))}
-                      className="w-full bg-background border border-border rounded-sm py-1.5 px-2.5 text-xs text-foreground focus:outline-none focus:border-accent font-semibold"
+                      className="w-full bg-background border border-border rounded-sm py-1.5 px-2 text-xs text-foreground focus:outline-none focus:border-accent font-semibold text-center"
                     />
                   </div>
 

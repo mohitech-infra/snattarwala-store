@@ -27,6 +27,8 @@ function ShopContent() {
   const [selectedGenders, setSelectedGenders] = useState<string[]>([])
   const [selectedFamilies, setSelectedFamilies] = useState<string[]>([])
   const [selectedNotes, setSelectedNotes] = useState<string[]>([])
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([])
+  const [selectedBottleTypes, setSelectedBottleTypes] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState<number>(10000)
   const [inStockOnly, setInStockOnly] = useState(false)
 
@@ -52,6 +54,18 @@ function ShopContent() {
     }
     if (selectedNotes.length > 0) {
       filtered = filtered.filter(p => p.fragranceNotes?.some(note => selectedNotes.includes(note)))
+    }
+    if (selectedSizes.length > 0) {
+      filtered = filtered.filter(p => 
+        p.sizes?.some(s => selectedSizes.includes(s)) ||
+        p.variants?.some(v => selectedSizes.includes(v.size))
+      )
+    }
+    if (selectedBottleTypes.length > 0) {
+      filtered = filtered.filter(p => {
+        const types = p.variants?.map(v => v.bottleType).filter(Boolean) as string[] || []
+        return types.some(t => selectedBottleTypes.some(selected => t.toLowerCase().includes(selected.toLowerCase())))
+      })
     }
     filtered = filtered.filter(p => p.price <= priceRange)
     // Removed inStock filter because PublicProduct does not have inStock right now. 
@@ -237,6 +251,54 @@ function ShopContent() {
               </div>
             )}
             
+            {/* Bottle Sizes */}
+            <div>
+              <h3 className="font-heading font-semibold text-lg mb-4 tracking-tight border-b border-border/30 pb-2">Bottle Size</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {["3ml", "6ml", "12ml", "25ml", "30ml", "50ml", "100ml"].map(size => {
+                  const isSelected = selectedSizes.includes(size)
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => toggleFilter(setSelectedSizes, size)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-sm border transition-all ${
+                        isSelected
+                          ? "border-accent bg-accent/20 text-foreground font-bold shadow-xs ring-1 ring-accent"
+                          : "border-border/60 text-foreground/70 hover:border-accent hover:text-accent"
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Bottle Types */}
+            <div>
+              <h3 className="font-heading font-semibold text-lg mb-4 tracking-tight border-b border-border/30 pb-2">Bottle Type</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {["Spray", "Roll-On", "Glass Dipstick", "Pocket Atomizer", "Crystal Decanter"].map(bType => {
+                  const isSelected = selectedBottleTypes.includes(bType)
+                  return (
+                    <button
+                      key={bType}
+                      type="button"
+                      onClick={() => toggleFilter(setSelectedBottleTypes, bType)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-sm border transition-all ${
+                        isSelected
+                          ? "border-accent bg-accent/20 text-accent font-bold shadow-xs ring-1 ring-accent"
+                          : "border-border/60 text-foreground/70 hover:border-accent hover:text-accent"
+                      }`}
+                    >
+                      {bType}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
             {/* Price Range */}
             <div>
               <h3 className="font-heading font-semibold text-lg mb-5 tracking-tight border-b border-border/30 pb-2">Max Price</h3>
@@ -284,6 +346,8 @@ function ShopContent() {
                     setSelectedGenders([])
                     setSelectedFamilies([])
                     setSelectedNotes([])
+                    setSelectedSizes([])
+                    setSelectedBottleTypes([])
                     setPriceRange(10000)
                     setInStockOnly(false)
                   }}
