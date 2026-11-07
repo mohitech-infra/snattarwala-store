@@ -304,7 +304,6 @@ function ProductVariantsEditor({
                     <span className="text-[10px] text-foreground/50 sm:hidden w-24">Size:</span>
                     <input
                       type="text"
-                      required
                       value={v.size}
                       onChange={(e) => handleUpdateVariant(idx, "size", e.target.value)}
                       placeholder="e.g. 6ml"
@@ -487,7 +486,6 @@ function ProductVariantsEditor({
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/50 text-xs">₹</span>
                       <input
                         type="number"
-                        required
                         min="0"
                         value={v.price}
                         onChange={(e) => handleUpdateVariant(idx, "price", Number(e.target.value))}
@@ -643,117 +641,153 @@ export default function AdminProductsPage() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Partial<AdminProduct> | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newProduct.name) {
-      alert("Please enter Fragrance Name")
+    if (isSubmitting) return
+
+    const trimmedName = (newProduct.name || "").trim()
+    if (!trimmedName) {
+      alert("Please enter a Fragrance Name.")
       return
     }
 
-    const variants = newProduct.variants && newProduct.variants.length > 0 ? newProduct.variants : []
-    const defaultVar = variants.find(v => v.isDefault) || variants[0]
-    const finalPrice = defaultVar ? defaultVar.price : (newProduct.price || 1500)
-    const finalSalePrice = (defaultVar?.compareAtPrice !== undefined && defaultVar?.compareAtPrice !== null)
-      ? defaultVar.compareAtPrice
-      : (newProduct.salePrice || undefined)
-    const totalStock = variants.length > 0
-      ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
-      : (newProduct.stock || 20)
-    const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (newProduct.size || "")
+    setIsSubmitting(true)
+    try {
+      const variants = newProduct.variants && newProduct.variants.length > 0 ? newProduct.variants : []
+      const defaultVar = variants.find(v => v.isDefault) || variants[0]
+      const finalPrice = defaultVar ? defaultVar.price : (newProduct.price || 1500)
+      const finalSalePrice = (defaultVar?.compareAtPrice !== undefined && defaultVar?.compareAtPrice !== null)
+        ? defaultVar.compareAtPrice
+        : (newProduct.salePrice || undefined)
+      const totalStock = variants.length > 0
+        ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+        : (newProduct.stock || 20)
+      const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (newProduct.size || "")
 
-    const allImages = Array.isArray(newProduct.images) && newProduct.images.length > 0
-      ? newProduct.images
-      : (newProduct.imageUrl ? [newProduct.imageUrl] : [])
-    const primaryImg = newProduct.imageUrl || allImages[0] || "/products/white-oudh-attar.jpg"
+      const allImages = Array.isArray(newProduct.images) && newProduct.images.length > 0
+        ? newProduct.images
+        : (newProduct.imageUrl ? [newProduct.imageUrl] : [])
+      const primaryImg = newProduct.imageUrl || allImages[0] || "/products/white-oudh-attar.jpg"
 
-    const productToCreate = {
-      ...newProduct,
-      price: finalPrice,
-      salePrice: finalSalePrice,
-      stock: totalStock,
-      size: sizeSummary,
-      variants,
-      images: allImages,
-      imageUrl: primaryImg,
-      category: newProduct.category || "Attars",
-      sku: newProduct.sku?.trim() || `SNA-${newProduct.name.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
-      description: newProduct.description?.trim() || `Exquisite luxury ${newProduct.name} crafted by SN AttarWala.`,
-      shortDescription: newProduct.shortDescription?.trim() || newProduct.name,
-    }
+      const autoSku = `SNA-${trimmedName.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`
+      const finalSku = newProduct.sku?.trim() || autoSku
 
-    const res = await createAdminProduct(productToCreate)
-    if (res.success) {
-      setIsAddModalOpen(false)
-      setNewProduct({
-        name: "",
-        slug: "",
-        sku: "",
-        category: "Attars",
-        series: "",
-        gender: "Unisex",
-        fragranceFamily: "Oud",
-        price: 1500,
-        salePrice: 1800,
-        costPrice: 500,
-        stock: 20,
-        reorderLevel: 5,
-        status: "Active",
-        imageUrl: "",
-        images: [],
-        description: "",
-        shortDescription: "",
-        notes: { top: ["Bergamot"], heart: ["Agarwood"], base: ["Amber"] },
-        variants: [
-          { size: "6ml", bottleType: "Roll-On", sku: "SNA-6ML-ROL", price: 1500, stock: 12, compareAtPrice: 1800, isDefault: true },
-          { size: "12ml", bottleType: "Roll-On", sku: "SNA-12ML-ROL", price: 2800, stock: 8, compareAtPrice: 3200, isDefault: false }
-        ]
-      })
-      await loadProducts()
-      alert("✅ New luxury fragrance published to database successfully with size variants!")
-    } else {
-      alert(`Failed to save product: ${res.error}`)
+      const productToCreate = {
+        ...newProduct,
+        name: trimmedName,
+        price: finalPrice,
+        salePrice: finalSalePrice,
+        stock: totalStock,
+        size: sizeSummary,
+        variants,
+        images: allImages,
+        imageUrl: primaryImg,
+        category: newProduct.category || "Attars",
+        sku: finalSku,
+        description: newProduct.description?.trim() || `Exquisite luxury ${trimmedName} crafted by SN AttarWala.`,
+        shortDescription: newProduct.shortDescription?.trim() || trimmedName,
+      }
+
+      const res = await createAdminProduct(productToCreate)
+      if (res && res.success) {
+        setIsAddModalOpen(false)
+        setNewProduct({
+          name: "",
+          slug: "",
+          sku: "",
+          category: "Attars",
+          series: "",
+          gender: "Unisex",
+          fragranceFamily: "Oud",
+          price: 1500,
+          salePrice: 1800,
+          costPrice: 500,
+          stock: 20,
+          reorderLevel: 5,
+          status: "Active",
+          imageUrl: "",
+          images: [],
+          description: "",
+          shortDescription: "",
+          notes: { top: ["Bergamot"], heart: ["Agarwood"], base: ["Amber"] },
+          variants: [
+            { size: "6ml", bottleType: "Roll-On", sku: "SNA-6ML-ROL", price: 1500, stock: 12, compareAtPrice: 1800, isDefault: true },
+            { size: "12ml", bottleType: "Roll-On", sku: "SNA-12ML-ROL", price: 2800, stock: 8, compareAtPrice: 3200, isDefault: false }
+          ]
+        })
+        await loadProducts()
+        alert("✅ New luxury fragrance published to database successfully with size variants!")
+      } else {
+        alert(`Failed to save product: ${res?.error || "Unknown error occurred"}`)
+      }
+    } catch (err: any) {
+      console.error("Error creating product:", err)
+      alert(`Unexpected error while publishing: ${err?.message || err}`)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleEditProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingProduct || !editingProduct.id) return
+    if (isSubmitting) return
 
-    const variants = editingProduct.variants && editingProduct.variants.length > 0 ? editingProduct.variants : []
-    const defaultVar = variants.find(v => v.isDefault) || variants[0]
-    const finalPrice = defaultVar ? defaultVar.price : (editingProduct.price || 1500)
-    const finalSalePrice = (defaultVar?.compareAtPrice !== undefined && defaultVar?.compareAtPrice !== null)
-      ? defaultVar.compareAtPrice
-      : (editingProduct.salePrice || undefined)
-    const totalStock = variants.length > 0
-      ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
-      : (editingProduct.stock || 20)
-    const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (editingProduct.size || "")
-
-    const allImages = Array.isArray(editingProduct.images) && editingProduct.images.length > 0
-      ? editingProduct.images
-      : (editingProduct.imageUrl ? [editingProduct.imageUrl] : [])
-    const primaryImg = editingProduct.imageUrl || allImages[0] || "/products/white-oudh-attar.jpg"
-
-    const productToUpdate = {
-      ...editingProduct,
-      price: finalPrice,
-      salePrice: finalSalePrice,
-      stock: totalStock,
-      size: sizeSummary,
-      variants,
-      images: allImages,
-      imageUrl: primaryImg
+    const trimmedName = (editingProduct.name || "").trim()
+    if (!trimmedName) {
+      alert("Please enter a Fragrance Name.")
+      return
     }
 
-    const ok = await updateAdminProduct(editingProduct.id, productToUpdate)
-    if (ok) {
-      setIsEditModalOpen(false)
-      await loadProducts()
-      alert("✅ Product and size pricing updated successfully!")
-    } else {
-      alert("Failed to update product. (Check Supabase RLS Policies)")
+    setIsSubmitting(true)
+    try {
+      const variants = editingProduct.variants && editingProduct.variants.length > 0 ? editingProduct.variants : []
+      const defaultVar = variants.find(v => v.isDefault) || variants[0]
+      const finalPrice = defaultVar ? defaultVar.price : (editingProduct.price || 1500)
+      const finalSalePrice = (defaultVar?.compareAtPrice !== undefined && defaultVar?.compareAtPrice !== null)
+        ? defaultVar.compareAtPrice
+        : (editingProduct.salePrice || undefined)
+      const totalStock = variants.length > 0
+        ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+        : (editingProduct.stock || 20)
+      const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (editingProduct.size || "")
+
+      const allImages = Array.isArray(editingProduct.images) && editingProduct.images.length > 0
+        ? editingProduct.images
+        : (editingProduct.imageUrl ? [editingProduct.imageUrl] : [])
+      const primaryImg = editingProduct.imageUrl || allImages[0] || "/products/white-oudh-attar.jpg"
+
+      const autoSku = `SNA-${trimmedName.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`
+      const finalSku = editingProduct.sku?.trim() || autoSku
+
+      const productToUpdate = {
+        ...editingProduct,
+        name: trimmedName,
+        sku: finalSku,
+        price: finalPrice,
+        salePrice: finalSalePrice,
+        stock: totalStock,
+        size: sizeSummary,
+        variants,
+        images: allImages,
+        imageUrl: primaryImg
+      }
+
+      const ok = await updateAdminProduct(editingProduct.id, productToUpdate)
+      if (ok) {
+        setIsEditModalOpen(false)
+        await loadProducts()
+        alert("✅ Product and size pricing updated successfully!")
+      } else {
+        alert("Failed to update product. (Check Supabase RLS Policies or network connection)")
+      }
+    } catch (err: any) {
+      console.error("Error updating product:", err)
+      alert(`Unexpected error while updating: ${err?.message || err}`)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -1218,7 +1252,7 @@ export default function AdminProductsPage() {
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleAddProduct} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto overscroll-contain custom-scrollbar" data-lenis-prevent>
+            <form onSubmit={handleAddProduct} noValidate className="p-6 space-y-6 max-h-[75vh] overflow-y-auto overscroll-contain custom-scrollbar" data-lenis-prevent>
               
               {/* Basic Information */}
               <div className="space-y-4">
@@ -1231,18 +1265,26 @@ export default function AdminProductsPage() {
                     <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Fragrance Name *</label>
                     <input
                       type="text"
-                      required
                       value={newProduct.name}
-                      onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        const autoSku = val.trim() ? `SNA-${val.trim().slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}` : ""
+                        setNewProduct({
+                          ...newProduct,
+                          name: val,
+                          sku: newProduct.sku && !newProduct.sku.startsWith("SNA-") ? newProduct.sku : (newProduct.sku || autoSku)
+                        })
+                      }}
                       placeholder="e.g. Royal Taif Rose Attar"
                       className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">SKU Code *</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">
+                      SKU Code <span className="text-[10px] text-foreground/50 font-normal lowercase">(auto-generated if left blank)</span>
+                    </label>
                     <input
                       type="text"
-                      required
                       value={newProduct.sku}
                       onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
                       placeholder="e.g. SNA-RTR-12"
@@ -1520,9 +1562,11 @@ export default function AdminProductsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-accent text-slate-950 font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-accent/90 transition-colors shadow-sm"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-accent text-slate-950 font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-2"
                 >
-                  Save & Publish Fragrance
+                  {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmitting ? "Publishing Fragrance..." : "Save & Publish Fragrance"}</span>
                 </button>
               </div>
 
@@ -1548,17 +1592,17 @@ export default function AdminProductsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleEditProduct} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto overscroll-contain custom-scrollbar" data-lenis-prevent>
+            <form onSubmit={handleEditProduct} noValidate className="p-6 space-y-6 max-h-[75vh] overflow-y-auto overscroll-contain custom-scrollbar" data-lenis-prevent>
               <div className="space-y-4">
                 <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">1. Basic Information</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">Fragrance Name *</label>
-                    <input required type="text" value={editingProduct.name || ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
+                    <input type="text" value={editingProduct.name || ""} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">SKU Code *</label>
-                    <input required type="text" value={editingProduct.sku || ""} onChange={(e) => setEditingProduct({...editingProduct, sku: e.target.value})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground font-mono" />
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground/70 block mb-1.5">SKU Code</label>
+                    <input type="text" value={editingProduct.sku || ""} onChange={(e) => setEditingProduct({...editingProduct, sku: e.target.value})} className="w-full bg-background border border-border rounded-sm py-2 px-3 text-xs focus:outline-none focus:border-accent text-foreground font-mono" />
                   </div>
                 </div>
 
@@ -1727,7 +1771,14 @@ export default function AdminProductsPage() {
 
               <div className="pt-4 border-t border-border/50 flex items-center justify-end space-x-3">
                 <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2.5 border border-border rounded-sm text-xs font-semibold uppercase tracking-wider hover:bg-secondary transition-colors">Cancel</button>
-                <button type="submit" className="px-6 py-2.5 bg-accent text-slate-950 font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-accent/90 transition-colors shadow-sm">Save Changes</button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-accent text-slate-950 font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-2"
+                >
+                  {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmitting ? "Saving Changes..." : "Save Changes"}</span>
+                </button>
               </div>
             </form>
           </div>
