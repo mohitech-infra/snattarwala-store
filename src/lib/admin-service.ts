@@ -366,6 +366,8 @@ export async function createAdminProduct(productData: Partial<AdminProduct>): Pr
       price: productData.price || 1500,
       compare_at_price: productData.salePrice || null,
       stock_quantity: productData.stock || 20,
+      size: productData.size || (Array.isArray(productData.variants) ? productData.variants.map((v: any) => v.size).join(", ") : null),
+      variants: Array.isArray(productData.variants) ? productData.variants : [],
       gender: productData.gender || "Unisex",
       fragrance_type: categoryName === "Attars" ? "Attar Oil" : categoryName === "Bakhoor" ? "Incense Wood" : "Eau De Parfum",
       top_notes: Array.isArray(productData.notes?.top) ? productData.notes.top.join(", ") : (productData.notes?.top || "Bergamot"),
@@ -464,6 +466,8 @@ export async function updateAdminProduct(id: string, updates: Partial<AdminProdu
       payload.tags = updates.series ? [updates.series] : []
       payload.series = updates.series || null
     }
+    if (updates.size !== undefined) payload.size = updates.size
+    if (updates.variants !== undefined) payload.variants = updates.variants
 
     let { error } = await supabase.from("products").update(payload).eq("id", id)
     if (error && error.message?.includes("series")) {
