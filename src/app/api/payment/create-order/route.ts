@@ -72,7 +72,20 @@ export async function POST(req: Request) {
     })
   } catch (error: any) {
     console.error("Error creating Razorpay order:", error)
-    const statusCode = error?.statusCode === 401 ? 401 : (error?.statusCode || 500)
+    const isAuthFailed = error?.statusCode === 401 || 
+      error?.error?.description?.toLowerCase().includes("authentication failed") ||
+      error?.message?.toLowerCase().includes("authentication failed")
+
+    if (isAuthFailed) {
+      return NextResponse.json(
+        { 
+          error: "Razorpay Gateway Authentication Failed: The RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is invalid or expired. Please generate a new key pair in your Razorpay Dashboard (Settings > API Keys) and update your .env file." 
+        },
+        { status: 401 }
+      )
+    }
+
+    const statusCode = error?.statusCode || 500
     return NextResponse.json(
       { 
         error: error?.error?.description || error?.message || "Failed to create payment order" 
