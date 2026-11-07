@@ -141,13 +141,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    if (newProd && image_url) {
-      await supabase.from("product_images").insert({
-        product_id: newProd.id,
-        image_url,
-        is_primary: true,
-        display_order: 0,
-      })
+    if (newProd) {
+      const allImgs: string[] = Array.isArray(body.images) && body.images.length > 0
+        ? body.images.filter(Boolean)
+        : (image_url ? [image_url] : [])
+
+      if (allImgs.length > 0) {
+        const inserts = allImgs.map((img: string, idx: number) => ({
+          product_id: newProd.id,
+          image_url: img,
+          is_primary: idx === 0 || img === image_url,
+          display_order: idx,
+        }))
+        await supabase.from("product_images").insert(inserts)
+      }
     }
 
     return NextResponse.json({ success: true, data: newProd })
@@ -243,23 +250,20 @@ export async function PATCH(req: NextRequest) {
     }
 
     const img = updates.imageUrl || updates.image_url
-    if (img) {
-      const { data: existingImg } = await supabase
-        .from("product_images")
-        .select("id")
-        .eq("product_id", id)
-        .eq("is_primary", true)
-        .limit(1)
+    if (updates.images !== undefined || img) {
+      const allImgs: string[] = Array.isArray(updates.images) && updates.images.length > 0
+        ? updates.images.filter(Boolean)
+        : (img ? [img] : [])
 
-      if (existingImg && existingImg.length > 0) {
-        await supabase.from("product_images").update({ image_url: img }).eq("id", existingImg[0].id)
-      } else {
-        await supabase.from("product_images").insert({
+      if (allImgs.length > 0) {
+        await supabase.from("product_images").delete().eq("product_id", id)
+        const inserts = allImgs.map((imgUrl: string, idx: number) => ({
           product_id: id,
-          image_url: img,
-          is_primary: true,
-          display_order: 0,
-        })
+          image_url: imgUrl,
+          is_primary: idx === 0 || imgUrl === img,
+          display_order: idx,
+        }))
+        await supabase.from("product_images").insert(inserts)
       }
     }
 

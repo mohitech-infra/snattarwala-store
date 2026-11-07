@@ -6,6 +6,7 @@ export interface ProductVariant {
   id?: string
   size: string
   bottleType?: string
+  imageUrl?: string
   price: number
   compareAtPrice?: number | null
   stock?: number
@@ -131,6 +132,7 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
           id: v.id,
           size: v.size || "Standard",
           bottleType: v.bottleType || v.bottle_type || getDefaultBottleType(categoryName, v.size),
+          imageUrl: v.imageUrl || v.image_url || undefined,
           price: Number(v.price) || Number(p.price),
           compareAtPrice: v.compareAtPrice !== undefined ? Number(v.compareAtPrice) : (v.compare_at_price !== undefined ? Number(v.compare_at_price) : (p.compare_at_price ? Number(p.compare_at_price) : null)),
           stock: v.stock !== undefined ? Number(v.stock) : (v.stock_quantity !== undefined ? Number(v.stock_quantity) : Number(p.stock_quantity) || 0),

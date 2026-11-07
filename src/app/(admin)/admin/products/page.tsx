@@ -20,11 +20,12 @@ import {
   RefreshCw,
   Star,
   Tag,
-  Box
+  Box,
+  Image as ImageIcon
 } from "lucide-react"
 import { getAdminProducts, createAdminProduct, deleteAdminProduct, updateAdminProduct, clearAllAdminProducts, AdminProduct } from "@/lib/admin-service"
 import { ExportMenu } from "@/components/admin/export-menu"
-import { ProductImageDropzone } from "@/components/admin/product-image-dropzone"
+import { ProductGalleryUploader } from "@/components/admin/product-gallery-uploader"
 
 interface VariantItem {
   size: string
@@ -34,6 +35,7 @@ interface VariantItem {
   stock: number
   sku?: string
   isDefault?: boolean
+  imageUrl?: string
 }
 
 const CATEGORY_PRESET_VARIANTS: Record<string, { size: string; bottleType: string }[]> = {
@@ -74,16 +76,22 @@ function ProductVariantsEditor({
   baseSku,
   basePrice,
   variants = [],
-  onChange
+  galleryImages = [],
+  onChange,
+  onAddGalleryImage,
 }: {
   category: string
   baseSku: string
   basePrice: number
   variants?: VariantItem[]
+  galleryImages?: string[]
   onChange: (updated: VariantItem[]) => void
+  onAddGalleryImage?: (url: string) => void
 }) {
   const [customSize, setCustomSize] = useState("")
   const [customBottleType, setCustomBottleType] = useState("Roll-On")
+  const [activePickerIndex, setActivePickerIndex] = useState<number | null>(null)
+  const [isUploadingBottlePhoto, setIsUploadingBottlePhoto] = useState(false)
   const presets = CATEGORY_PRESET_VARIANTS[category] || CATEGORY_PRESET_VARIANTS["Attars"]
   const currentVariants = Array.isArray(variants) ? variants : []
 
@@ -271,8 +279,9 @@ function ProductVariantsEditor({
           <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-wider text-foreground/50 px-2">
             <div className="col-span-2">Size Name</div>
             <div className="col-span-2">Bottle Type</div>
-            <div className="col-span-3">Selling Price (₹) *</div>
-            <div className="col-span-2">MRP (Compare ₹)</div>
+            <div className="col-span-2">Bottle Photo</div>
+            <div className="col-span-2">Selling Price (₹) *</div>
+            <div className="col-span-1">MRP (₹)</div>
             <div className="col-span-1">Stock</div>
             <div className="col-span-2 text-right">Default / Remove</div>
           </div>
@@ -317,8 +326,162 @@ function ProductVariantsEditor({
                     </select>
                   </div>
 
+                  {/* Bottle Photo Assignment */}
+                  <div className="sm:col-span-2 relative">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-foreground/50 sm:hidden w-24">Photo:</span>
+                      <button
+                        type="button"
+                        onClick={() => setActivePickerIndex(activePickerIndex === idx ? null : idx)}
+                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded-sm border text-[11px] transition-all w-full ${
+                          v.imageUrl
+                            ? "border-accent/60 bg-accent/10 hover:border-accent text-foreground font-semibold"
+                            : "border-dashed border-border/80 hover:border-accent/70 hover:bg-secondary/40 text-foreground/60"
+                        }`}
+                        title={v.imageUrl ? "Click to change photo for this bottle" : "Click to select or upload photo for this bottle"}
+                      >
+                        {v.imageUrl ? (
+                          <>
+                            <img
+                              src={v.imageUrl}
+                              alt={`${v.size} ${v.bottleType}`}
+                              className="w-4 h-4 object-cover rounded-xs border border-border shrink-0 shadow-xs"
+                            />
+                            <span className="truncate text-[10px]">Photo Linked</span>
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+                            <span className="truncate text-[10px]">+ Bottle Photo</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Visual Photo Picker Popover */}
+                    {activePickerIndex === idx && (
+                      <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-card border border-border shadow-2xl rounded-md p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/50">
+                          <div>
+                            <span className="text-[11px] font-bold text-foreground block">
+                              Select Photo for {v.size} ({v.bottleType || "Bottle"})
+                            </span>
+                            <span className="text-[9px] text-foreground/50">
+                              Switches on storefront when customer clicks this size
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActivePickerIndex(null)}
+                            className="p-1 hover:bg-secondary rounded text-foreground/50"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Gallery Photos Grid */}
+                        {galleryImages.length > 0 ? (
+                          <div className="space-y-1.5 mb-2.5">
+                            <span className="text-[10px] uppercase font-semibold text-foreground/60 block">
+                              From Uploaded Gallery ({galleryImages.length}):
+                            </span>
+                            <div className="grid grid-cols-4 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                              {galleryImages.map((imgUrl, imgIdx) => {
+                                const isSelected = v.imageUrl === imgUrl
+                                return (
+                                  <button
+                                    key={`${imgUrl}-${imgIdx}`}
+                                    type="button"
+                                    onClick={() => {
+                                      handleUpdateVariant(idx, "imageUrl", imgUrl)
+                                      setActivePickerIndex(null)
+                                    }}
+                                    className={`aspect-square relative rounded overflow-hidden border transition-all ${
+                                      isSelected
+                                        ? "border-accent ring-2 ring-accent shadow-sm"
+                                        : "border-border hover:border-accent/60 opacity-80 hover:opacity-100"
+                                    }`}
+                                    title="Click to assign this image"
+                                  >
+                                    <img
+                                      src={imgUrl}
+                                      alt={`Option ${imgIdx + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    {isSelected && (
+                                      <div className="absolute inset-0 bg-accent/30 flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-slate-950 font-bold bg-accent rounded-full p-0.5" />
+                                      </div>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="py-2 text-center text-[10px] text-foreground/50 bg-secondary/20 rounded p-2 mb-2">
+                            No gallery photos uploaded yet. Upload one below!
+                          </div>
+                        )}
+
+                        {/* Direct File Upload & Clear Buttons */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-border/40">
+                          <label className="flex-1 cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0]
+                                if (!file) return
+                                try {
+                                  setIsUploadingBottlePhoto(true)
+                                  const formData = new FormData()
+                                  formData.append("file", file)
+                                  const res = await fetch("/api/admin/upload", { method: "POST", body: formData })
+                                  const data = await res.json()
+                                  if (data.success && data.url) {
+                                    handleUpdateVariant(idx, "imageUrl", data.url)
+                                    if (onAddGalleryImage) onAddGalleryImage(data.url)
+                                    setActivePickerIndex(null)
+                                  }
+                                } catch (uploadErr) {
+                                  console.error("Bottle photo upload failed:", uploadErr)
+                                } finally {
+                                  setIsUploadingBottlePhoto(false)
+                                }
+                              }}
+                            />
+                            <div className="w-full py-1.5 px-2 bg-secondary hover:bg-secondary/80 border border-border rounded text-[10px] font-semibold text-foreground text-center transition-colors flex items-center justify-center gap-1">
+                              {isUploadingBottlePhoto ? (
+                                <RefreshCw className="w-3 h-3 animate-spin text-accent" />
+                              ) : (
+                                <Plus className="w-3 h-3 text-accent" />
+                              )}
+                              <span>Upload Bottle Shot</span>
+                            </div>
+                          </label>
+
+                          {v.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleUpdateVariant(idx, "imageUrl", undefined)
+                                setActivePickerIndex(null)
+                              }}
+                              className="py-1.5 px-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded text-[10px] font-semibold transition-colors"
+                              title="Clear photo and use cover image"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Selling Price */}
-                  <div className="sm:col-span-3 flex items-center gap-1.5">
+                  <div className="sm:col-span-2 flex items-center gap-1.5">
                     <span className="text-[10px] text-foreground/50 sm:hidden w-24">Selling Price:</span>
                     <div className="relative w-full">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/50 text-xs">₹</span>
@@ -334,23 +497,17 @@ function ProductVariantsEditor({
                   </div>
 
                   {/* Compare Price */}
-                  <div className="sm:col-span-2 flex items-center gap-1.5">
+                  <div className="sm:col-span-1 flex items-center gap-1.5">
                     <span className="text-[10px] text-foreground/50 sm:hidden w-24">MRP Price:</span>
                     <div className="relative w-full">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/50 text-xs">₹</span>
                       <input
                         type="number"
                         min="0"
                         value={v.compareAtPrice || ""}
                         onChange={(e) => handleUpdateVariant(idx, "compareAtPrice", e.target.value ? Number(e.target.value) : null)}
                         placeholder="MRP"
-                        className="w-full bg-background border border-border rounded-sm py-1.5 pl-6 pr-2.5 text-xs text-foreground focus:outline-none focus:border-accent"
+                        className="w-full bg-background border border-border rounded-sm py-1.5 px-2 text-xs text-foreground focus:outline-none focus:border-accent text-center"
                       />
-                      {discount > 0 && (
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-500">
-                          {discount}%
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -451,6 +608,7 @@ export default function AdminProductsPage() {
     reorderLevel: 5,
     status: "Active",
     imageUrl: "",
+    images: [],
     description: "",
     shortDescription: "",
     notes: {
@@ -504,6 +662,11 @@ export default function AdminProductsPage() {
       : (newProduct.stock || 20)
     const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (newProduct.size || "")
 
+    const allImages = Array.isArray(newProduct.images) && newProduct.images.length > 0
+      ? newProduct.images
+      : (newProduct.imageUrl ? [newProduct.imageUrl] : [])
+    const primaryImg = newProduct.imageUrl || allImages[0] || "/products/white-oudh-attar.jpg"
+
     const productToCreate = {
       ...newProduct,
       price: finalPrice,
@@ -511,9 +674,10 @@ export default function AdminProductsPage() {
       stock: totalStock,
       size: sizeSummary,
       variants,
+      images: allImages,
+      imageUrl: primaryImg,
       category: newProduct.category || "Attars",
       sku: newProduct.sku?.trim() || `SNA-${newProduct.name.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
-      imageUrl: newProduct.imageUrl || "/products/white-oudh-attar.jpg",
       description: newProduct.description?.trim() || `Exquisite luxury ${newProduct.name} crafted by SN AttarWala.`,
       shortDescription: newProduct.shortDescription?.trim() || newProduct.name,
     }
@@ -536,6 +700,7 @@ export default function AdminProductsPage() {
         reorderLevel: 5,
         status: "Active",
         imageUrl: "",
+        images: [],
         description: "",
         shortDescription: "",
         notes: { top: ["Bergamot"], heart: ["Agarwood"], base: ["Amber"] },
@@ -566,13 +731,20 @@ export default function AdminProductsPage() {
       : (editingProduct.stock || 20)
     const sizeSummary = variants.length > 0 ? variants.map(v => v.size).join(", ") : (editingProduct.size || "")
 
+    const allImages = Array.isArray(editingProduct.images) && editingProduct.images.length > 0
+      ? editingProduct.images
+      : (editingProduct.imageUrl ? [editingProduct.imageUrl] : [])
+    const primaryImg = editingProduct.imageUrl || allImages[0] || "/products/white-oudh-attar.jpg"
+
     const productToUpdate = {
       ...editingProduct,
       price: finalPrice,
       salePrice: finalSalePrice,
       stock: totalStock,
       size: sizeSummary,
-      variants
+      variants,
+      images: allImages,
+      imageUrl: primaryImg
     }
 
     const ok = await updateAdminProduct(editingProduct.id, productToUpdate)
@@ -595,7 +767,8 @@ export default function AdminProductsPage() {
     const initialVariants = product.variants && product.variants.length > 0
       ? product.variants.map(v => ({
           ...v,
-          bottleType: v.bottleType || defaultBottle
+          bottleType: v.bottleType || defaultBottle,
+          imageUrl: v.imageUrl || undefined
         }))
       : (product.size ? product.size.split(",").map((s, idx) => ({
           size: s.trim(),
@@ -617,8 +790,14 @@ export default function AdminProductsPage() {
           }
         ])
 
+    const allImgs: string[] = Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : (product.imageUrl ? [product.imageUrl] : [])
+
     setEditingProduct({
       ...product,
+      images: allImgs,
+      imageUrl: product.imageUrl || allImgs[0] || "",
       variants: initialVariants
     })
     setIsEditModalOpen(true)
@@ -1196,6 +1375,7 @@ export default function AdminProductsPage() {
                   baseSku={newProduct.sku || "SNA"}
                   basePrice={newProduct.price || 1500}
                   variants={newProduct.variants || []}
+                  galleryImages={newProduct.images || []}
                   onChange={(updatedVariants) => {
                     const defaultVar = updatedVariants.find(v => v.isDefault) || updatedVariants[0]
                     setNewProduct({
@@ -1208,6 +1388,16 @@ export default function AdminProductsPage() {
                       stock: updatedVariants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0),
                       size: updatedVariants.map(v => v.size).join(", ")
                     })
+                  }}
+                  onAddGalleryImage={(url) => {
+                    const existing = newProduct.images || []
+                    if (!existing.includes(url)) {
+                      setNewProduct({
+                        ...newProduct,
+                        images: [...existing, url],
+                        imageUrl: newProduct.imageUrl || url
+                      })
+                    }
                   }}
                 />
 
@@ -1298,17 +1488,24 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* Product Image Asset with Drag & Drop */}
+              {/* Product Gallery & Multi-Photo Upload */}
               <div className="space-y-4">
-                <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">
-                  4. Media & Fragrance Photography
-                </h4>
-
-                <ProductImageDropzone
-                  value={newProduct.imageUrl}
-                  onChange={(url) => setNewProduct({ ...newProduct, imageUrl: url })}
-                  label="Fragrance Bottle Photo"
-                  helpText="Drag & drop bottle photo here, or click to browse (PNG, JPG, WEBP)"
+                <ProductGalleryUploader
+                  images={newProduct.images || []}
+                  primaryImage={newProduct.imageUrl || newProduct.images?.[0] || ""}
+                  onChangeImages={(imgs) => {
+                    setNewProduct({
+                      ...newProduct,
+                      images: imgs,
+                      imageUrl: imgs.includes(newProduct.imageUrl || "") ? newProduct.imageUrl : (imgs[0] || "")
+                    })
+                  }}
+                  onSetPrimary={(url) => {
+                    setNewProduct({
+                      ...newProduct,
+                      imageUrl: url
+                    })
+                  }}
                 />
               </div>
 
@@ -1454,6 +1651,7 @@ export default function AdminProductsPage() {
                   baseSku={editingProduct.sku || "SNA"}
                   basePrice={editingProduct.price || 1500}
                   variants={editingProduct.variants || []}
+                  galleryImages={editingProduct.images || []}
                   onChange={(updatedVariants) => {
                     const defaultVar = updatedVariants.find(v => v.isDefault) || updatedVariants[0]
                     setEditingProduct({
@@ -1466,6 +1664,16 @@ export default function AdminProductsPage() {
                       stock: updatedVariants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0),
                       size: updatedVariants.map(v => v.size).join(", ")
                     })
+                  }}
+                  onAddGalleryImage={(url) => {
+                    const existing = editingProduct.images || []
+                    if (!existing.includes(url)) {
+                      setEditingProduct({
+                        ...editingProduct,
+                        images: [...existing, url],
+                        imageUrl: editingProduct.imageUrl || url
+                      })
+                    }
                   }}
                 />
 
@@ -1498,12 +1706,22 @@ export default function AdminProductsPage() {
               </div>
 
               <div className="space-y-4">
-                <h4 className="font-heading font-bold text-sm uppercase tracking-wider text-accent border-b border-border/40 pb-2">3. Media & Product Photo</h4>
-                <ProductImageDropzone
-                  value={editingProduct.imageUrl}
-                  onChange={(url) => setEditingProduct({ ...editingProduct, imageUrl: url })}
-                  label="Fragrance Bottle Photo"
-                  helpText="Drag & drop new photo to replace current image"
+                <ProductGalleryUploader
+                  images={editingProduct.images || []}
+                  primaryImage={editingProduct.imageUrl || editingProduct.images?.[0] || ""}
+                  onChangeImages={(imgs) => {
+                    setEditingProduct({
+                      ...editingProduct,
+                      images: imgs,
+                      imageUrl: imgs.includes(editingProduct.imageUrl || "") ? editingProduct.imageUrl : (imgs[0] || "")
+                    })
+                  }}
+                  onSetPrimary={(url) => {
+                    setEditingProduct({
+                      ...editingProduct,
+                      imageUrl: url
+                    })
+                  }}
                 />
               </div>
 

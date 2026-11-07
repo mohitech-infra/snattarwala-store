@@ -26,7 +26,8 @@ export interface AdminProduct {
   reviewsCount: number
   status: "Active" | "Draft" | "Low Stock" | "Out of Stock"
   imageUrl: string
-  variants: { size: string; bottleType?: string; sku?: string; price: number; stock: number; compareAtPrice?: number | null; isDefault?: boolean }[]
+  images?: string[]
+  variants: { size: string; bottleType?: string; sku?: string; price: number; stock: number; compareAtPrice?: number | null; isDefault?: boolean; imageUrl?: string }[]
   size?: string
   notes: { top: string[]; heart: string[]; base: string[] }
   isFeatured?: boolean
@@ -246,8 +247,12 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
     }
 
     return dbProducts.map((p: any) => {
+      const allImgs: string[] = Array.isArray(p.images) ? p.images.map((img: any) => img.image_url).filter(Boolean) : []
+      if (p.image_url && !allImgs.includes(p.image_url)) {
+        allImgs.unshift(p.image_url)
+      }
       const primaryImg = p.images?.find((img: any) => img.is_primary)?.image_url 
-        || p.images?.[0]?.image_url 
+        || allImgs[0] 
         || p.image_url 
         || "/products/white-oudh-attar.jpg"
       const stock = Number(p.stock_quantity) || 0
@@ -281,12 +286,14 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
         reviewsCount: Number(p.review_count) || 0,
         status: status,
         imageUrl: primaryImg,
+        images: allImgs.length > 0 ? allImgs : [primaryImg],
         description: p.description || "",
         shortDescription: p.short_description || "",
         variants: Array.isArray(p.variants) && p.variants.length > 0
           ? p.variants.map((v: any, idx: number) => ({
               size: v.size || "Standard",
               bottleType: v.bottleType || v.bottle_type || (p.fragrance_type?.includes("Attar") ? "Roll-On" : "Fine Mist Spray"),
+              imageUrl: v.imageUrl || v.image_url || undefined,
               sku: v.sku || `${p.sku || 'SKU'}-${v.size || idx}`,
               price: Number(v.price) || Number(p.price) || 1500,
               compareAtPrice: v.compareAtPrice !== undefined ? Number(v.compareAtPrice) : (p.compare_at_price ? Number(p.compare_at_price) : undefined),
@@ -398,13 +405,20 @@ export async function createAdminProduct(productData: Partial<AdminProduct>): Pr
 
     if (error) throw error
 
-    if (newProd && imgUrl) {
-      await supabase.from("product_images").insert({
-        product_id: newProd.id,
-        image_url: imgUrl,
-        is_primary: true,
-        display_order: 0,
-      })
+    if (newProd) {
+      const allImgs: string[] = Array.isArray(productData.images) && productData.images.length > 0
+        ? productData.images.filter(Boolean)
+        : (imgUrl ? [imgUrl] : [])
+
+      if (allImgs.length > 0) {
+        const inserts = allImgs.map((url: string, idx: number) => ({
+          product_id: newProd.id,
+          image_url: url,
+          is_primary: idx === 0 || url === imgUrl,
+          display_order: idx,
+        }))
+        await supabase.from("product_images").insert(inserts)
+      }
     }
 
     triggerAdminCountsSync()
@@ -480,26 +494,20 @@ export async function updateAdminProduct(id: string, updates: Partial<AdminProdu
       return false
     }
 
-    if (updates.imageUrl) {
-      const { data: existingImg } = await supabase
-        .from("product_images")
-        .select("id")
-        .eq("product_id", id)
-        .eq("is_primary", true)
-        .limit(1)
+    if (updates.images !== undefined || updates.imageUrl) {
+      const allImgs: string[] = Array.isArray(updates.images) && updates.images.length > 0
+        ? updates.images.filter(Boolean)
+        : (updates.imageUrl ? [updates.imageUrl] : [])
 
-      if (existingImg && existingImg.length > 0) {
-        await supabase
-          .from("product_images")
-          .update({ image_url: updates.imageUrl })
-          .eq("id", existingImg[0].id)
-      } else {
-        await supabase.from("product_images").insert({
+      if (allImgs.length > 0) {
+        await supabase.from("product_images").delete().eq("product_id", id)
+        const inserts = allImgs.map((url: string, idx: number) => ({
           product_id: id,
-          image_url: updates.imageUrl,
-          is_primary: true,
-          display_order: 0,
-        })
+          image_url: url,
+          is_primary: idx === 0 || url === updates.imageUrl,
+          display_order: idx,
+        }))
+        await supabase.from("product_images").insert(inserts)
       }
     }
 

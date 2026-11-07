@@ -87,6 +87,13 @@ export function ProductDetailView({
 
   const inStock = activeVariant?.stock !== undefined ? activeVariant.stock > 0 : (product.inStock ?? true)
 
+  // Automatically switch displayed main image when customer selects a bottle type/size with a specific photo
+  useEffect(() => {
+    if (activeVariant?.imageUrl) {
+      setSelectedImage(activeVariant.imageUrl)
+    }
+  }, [activeVariant?.imageUrl, selectedSize, selectedBottleType])
+
   const handleSelectSize = (size: string) => {
     setSelectedSize(size)
     const v = variants.find(item => item.size === size)
@@ -106,7 +113,7 @@ export function ProductDetailView({
         productId: product.id,
         name: product.name,
         price: currentPrice,
-        imageUrl: product.imageUrl || "/placeholder.jpg",
+        imageUrl: activeVariant?.imageUrl || selectedImage || product.imageUrl || "/placeholder.jpg",
         quantity,
         size: selectedSize || product.sizes[0] || "Standard",
         bottleType: selectedBottleType
@@ -116,9 +123,12 @@ export function ProductDetailView({
     }
   }
 
-  const gallery = product.imageGallery && product.imageGallery.length > 0 
-    ? product.imageGallery 
-    : [product.imageUrl]
+  const allImages = [
+    ...(product.imageGallery || []),
+    ...variants.map(v => v.imageUrl).filter(Boolean) as string[]
+  ]
+  const uniqueGallery = Array.from(new Set(allImages.filter(Boolean)))
+  const gallery = uniqueGallery.length > 0 ? uniqueGallery : [product.imageUrl || "/products/white-oudh-attar.jpg"]
 
   return (
     <div className="py-12 bg-background min-h-screen">
@@ -349,7 +359,7 @@ export function ProductDetailView({
                           productId: product.id,
                           name: product.name,
                           price: currentPrice,
-                          imageUrl: product.imageUrl || "/placeholder.jpg",
+                          imageUrl: activeVariant?.imageUrl || selectedImage || product.imageUrl || "/placeholder.jpg",
                           quantity,
                           size: selectedSize || product.sizes[0] || "Standard",
                           bottleType: selectedBottleType

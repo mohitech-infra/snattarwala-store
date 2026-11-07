@@ -99,9 +99,9 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Image Container */}
       <Link href={`/product/${product.slug}?variant=${encodeURIComponent(activeVariant?.sku || selectedSize)}`} className="relative aspect-[4/5] bg-secondary/30 overflow-hidden block">
-        {product.imageUrl ? (
+        {(activeVariant?.imageUrl || product.imageUrl) ? (
           <img 
-            src={product.imageUrl} 
+            src={activeVariant?.imageUrl || product.imageUrl} 
             alt={product.name}
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
