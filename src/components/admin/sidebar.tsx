@@ -29,7 +29,9 @@ import {
   Sparkles,
   ChevronRight,
   ExternalLink,
-  Briefcase
+  Briefcase,
+  UploadCloud,
+  History
 } from "lucide-react"
 
 interface SidebarProps {
@@ -147,13 +149,23 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
       allowedRoles: ["admin", "store_manager"]
     },
     {
-      title: "SHOP MANAGEMENT",
+      title: "CATALOGUE MANAGEMENT",
       items: [
         { 
-          name: "Products", 
+          name: "All Products", 
           href: "/admin/products", 
           icon: Package, 
           badge: String(counts.products ?? 0)
+        },
+        { 
+          name: "Bulk Upload", 
+          href: "/admin/products/bulk-upload", 
+          icon: UploadCloud 
+        },
+        { 
+          name: "Import History", 
+          href: "/admin/products/import-history", 
+          icon: History 
         },
         { name: "Categories", href: "/admin/categories", icon: FolderTree },
         { 
@@ -162,7 +174,13 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
           icon: Boxes, 
           badge: counts.lowStock > 0 ? `${counts.lowStock} Low` : undefined, 
           badgeColor: "text-amber-500 bg-amber-500/10" 
-        },
+        }
+      ],
+      allowedRoles: ["admin", "store_manager"]
+    },
+    {
+      title: "ORDERS & FULFILLMENT",
+      items: [
         { 
           name: "Orders", 
           href: "/admin/orders", 
@@ -315,7 +333,17 @@ export function AdminSidebar({ onCloseMobile, onOpenAI }: SidebarProps) {
               {section.title}
             </h4>
             {section.items.map((item) => {
-              const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/admin")
+              const isActive = pathname === item.href || (
+                item.href !== "/admin" &&
+                item.href !== "/admin/products" &&
+                pathname.startsWith(item.href + "/")
+              ) || (
+                item.href === "/admin/products" &&
+                (pathname === "/admin/products" ||
+                  (pathname.startsWith("/admin/products/") &&
+                    !pathname.startsWith("/admin/products/bulk-upload") &&
+                    !pathname.startsWith("/admin/products/import-history")))
+              )
               const Icon = item.icon
               return (
                 <Link
