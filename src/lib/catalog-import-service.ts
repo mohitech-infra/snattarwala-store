@@ -912,6 +912,7 @@ export async function executeCatalogueImport(
     adminUserId?: string
     fileName?: string
     fileSizeBytes?: number
+    imageUrlsBySku?: Record<string, Array<{ url: string; isPrimary?: boolean; role?: string }>>
   } = {}
 ): Promise<ImportExecutionResult> {
   const supabase = getSupabase()
@@ -952,12 +953,23 @@ export async function executeCatalogueImport(
       const totalStock = parentVars.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
       const sizeStr = parentVars.map(v => v.size).filter(Boolean).join(", ")
 
-      // Save & Upload Images for this SKU
-      const skuImages = imagesBySku[parentSku] || []
-      const savedImageUrls: Array<{ url: string; isPrimary: boolean; role: string }> = []
+      // Save & Upload Images for this SKU (or use pre-uploaded URLs from client)
+      const preUploaded = options.imageUrlsBySku?.[parentSku] || []
+      const savedImageUrls: Array<{ url: string; isPrimary: boolean; role: string }> = preUploaded.map((u, i) => ({
+        url: u.url,
+        isPrimary: u.isPrimary ?? (u.role === "primary" || i === 0),
+        role: u.role || (i === 0 ? "primary" : "secondary"),
+      }))
 
+      if (preUploaded.length > 0) {
+        successfulImages += preUploaded.length
+      }
+
+      const skuImages = imagesBySku[parentSku] || []
       for (let imgIdx = 0; imgIdx < skuImages.length; imgIdx++) {
         const img = skuImages[imgIdx]
+        if (!img.buffer || img.buffer.length === 0) continue
+
         const cleanName = `prod-${Date.now()}-${parentSku.toLowerCase()}-${img.role}-${imgIdx}${path.extname(img.fileName) || ".jpg"}`
         const filePath = path.join(uploadDir, cleanName)
 
@@ -974,7 +986,7 @@ export async function executeCatalogueImport(
 
         savedImageUrls.push({
           url: finalUrl,
-          isPrimary: img.role === "primary" || imgIdx === 0,
+          isPrimary: img.role === "primary" || (savedImageUrls.length === 0 && imgIdx === 0),
           role: img.role
         })
       }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useTransition } from "react"
 import Link from "next/link"
+import JSZip from "jszip"
 import { 
   UploadCloud, 
   FileSpreadsheet, 
@@ -122,8 +123,22 @@ export default function BulkUploadPage() {
     }
   }
 
+  // Helper to convert File to pure Base64 string
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        const base64 = result.includes(",") ? result.split(",")[1] : result
+        resolve(base64)
+      }
+      reader.onerror = (err) => reject(err)
+      reader.readAsDataURL(file)
+    })
+  }
+
   // =========================================================================
-  // STEP 2: VALIDATE FILES
+  // STEP 2: VALIDATE FILES (IMMUNE TO FORMDATA SIZE LIMITS & UNDICI BUGS)
   // =========================================================================
   const handleValidate = async () => {
     if (!spreadsheetFile) {
@@ -135,24 +150,156 @@ export default function BulkUploadPage() {
     setErrorMessage(null)
 
     try {
-      const formData = new FormData()
-      formData.append("spreadsheet", spreadsheetFile)
+      // 1. Read spreadsheet as Base64 (lightweight, ~50KB-200KB)
+      const spreadsheetBase64 = await fileToBase64(spreadsheetFile)
+
+      // 2. Extract image manifest and local preview thumbnails in the browser
+      // This completely avoids sending 20MB-100MB of raw image binaries to the validator!
+      const imageManifest: Array<{ fileName: string; path: string; sku: string; role: string }> = []
+      const localThumbnailsBySku: Record<string, string> = {}
+
       if (zipFile) {
-        formData.append("imagesZip", zipFile)
-      }
-      if (looseImages.length > 0) {
-        looseImages.forEach((img) => formData.append("images", img))
+        const zip = await JSZip.loadAsync(zipFile)
+        for (const [rawPath, zipEntry] of Object.entries(zip.files)) {
+          if (zipEntry.dir) continue
+          const cleanPath = rawPath.replace(/^(\.\.[\/\\])+/, "")
+          const ext = cleanPath.split(".").pop()?.toLowerCase() || ""
+          if (!["jpg", "jpeg", "png", "webp"].includes(ext)) continue
+
+          const parts = cleanPath.split(/[\/\\]/).filter(Boolean)
+          let sku = ""
+          if (parts.length >= 2) {
+            const folderCandidate = parts[parts.length - 2].toUpperCase()
+            if (folderCandidate !== "PRODUCTS" && folderCandidate !== "IMAGES") {
+              sku = folderCandidate
+            } else if (parts.length >= 3) {
+              sku = parts[parts.length - 2].toUpperCase()
+            }
+          }
+          if (!sku) {
+            const fileNameOnly = parts[parts.length - 1] || ""
+            const match = fileNameOnly.match(/^([A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+)/i)
+            if (match) {
+              sku = match[1].toUpperCase()
+            } else {
+              const flatParts = fileNameOnly.split(/[-_]/)
+              if (flatParts.length >= 2) {
+                sku = flatParts[0].toUpperCase()
+              }
+            }
+          }
+
+          if (sku) {
+            const lowerName = cleanPath.toLowerCase()
+            let role: "primary" | "secondary" | "lifestyle" | "variant" = "secondary"
+            if (
+              lowerName.includes("01") ||
+              lowerName.includes("hero") ||
+              lowerName.includes("front") ||
+              lowerName.includes("primary")
+            ) {
+              role = "primary"
+            } else if (
+              lowerName.includes("lifestyle") ||
+              lowerName.includes("03") ||
+              lowerName.includes("context")
+            ) {
+              role = "lifestyle"
+            }
+
+            const fileName = parts[parts.length - 1]
+            imageManifest.push({
+              fileName,
+              path: cleanPath,
+              sku,
+              role,
+            })
+
+            // Generate thumbnail for preview table
+            if (!localThumbnailsBySku[sku] || role === "primary") {
+              try {
+                const b64 = await zipEntry.async("base64")
+                const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg"
+                localThumbnailsBySku[sku] = `data:${mime};base64,${b64}`
+              } catch {
+                // Ignore individual thumbnail extraction issues
+              }
+            }
+          }
+        }
+      } else if (looseImages.length > 0) {
+        for (const file of looseImages) {
+          const lowerName = file.name.toLowerCase()
+          const ext = file.name.split(".").pop()?.toLowerCase() || ""
+          if (!["jpg", "jpeg", "png", "webp"].includes(ext)) continue
+
+          const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+          const parts = nameWithoutExt.split(/[-_]/)
+          let sku = ""
+          if (parts.length >= 3 && parts[0].length >= 2 && parts[1].length >= 2) {
+            sku = `${parts[0]}-${parts[1]}-${parts[2]}`.toUpperCase()
+          } else if (parts.length >= 2) {
+            sku = `${parts[0]}-${parts[1]}`.toUpperCase()
+          } else {
+            sku = parts[0].toUpperCase()
+          }
+
+          let role: "primary" | "secondary" | "lifestyle" | "variant" = "secondary"
+          if (
+            lowerName.includes("front") ||
+            lowerName.includes("hero") ||
+            lowerName.includes("01") ||
+            lowerName.includes("primary")
+          ) {
+            role = "primary"
+          } else if (
+            lowerName.includes("lifestyle") ||
+            lowerName.includes("03") ||
+            lowerName.includes("context")
+          ) {
+            role = "lifestyle"
+          }
+
+          imageManifest.push({
+            fileName: file.name,
+            path: file.name,
+            sku,
+            role,
+          })
+
+          if (!localThumbnailsBySku[sku] || role === "primary") {
+            localThumbnailsBySku[sku] = URL.createObjectURL(file)
+          }
+        }
       }
 
+      // 3. Send clean JSON payload (100% immune to Undici FormData multipart size & encoding crashes)
       const res = await fetch("/api/admin/catalog/validate", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          spreadsheetBase64,
+          spreadsheetFileName: spreadsheetFile.name,
+          imageManifest,
+        }),
       })
 
       const data = await res.json()
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to validate catalogue file.")
+      }
+
+      // Attach client-side local thumbnails to preview records
+      if (data.validation?.previewParents) {
+        data.validation.previewParents.forEach((p: any) => {
+          const sku = (p.parent?.sku || "").toUpperCase()
+          if (localThumbnailsBySku[sku] && p.images && p.images.length > 0) {
+            p.images[0].previewUrl = localThumbnailsBySku[sku]
+          }
+        })
       }
 
       setValidationResult(data.validation)
@@ -182,7 +329,7 @@ export default function BulkUploadPage() {
   }
 
   // =========================================================================
-  // STEP 4: EXECUTE CATALOGUE IMPORT
+  // STEP 4: EXECUTE CATALOGUE IMPORT (RESILIENT CHUNKED IMAGE PIPELINE)
   // =========================================================================
   const handleExecuteImport = async () => {
     if (!spreadsheetFile) return
@@ -191,48 +338,180 @@ export default function BulkUploadPage() {
     setCurrentStep("import")
     setErrorMessage(null)
     setImportProgress({
-      percent: 10,
-      stage: "Reading spreadsheet and extracting image files...",
+      percent: 5,
+      stage: "Preparing catalogue upload...",
       productsProcessed: 0,
       variantsProcessed: 0,
       imagesUploaded: 0,
     })
 
     try {
-      const formData = new FormData()
-      formData.append("spreadsheet", spreadsheetFile)
-      if (zipFile) {
-        formData.append("imagesZip", zipFile)
-      }
-      if (looseImages.length > 0) {
-        looseImages.forEach((img) => formData.append("images", img))
-      }
+      const spreadsheetBase64 = await fileToBase64(spreadsheetFile)
+      const imageUrlsBySku: Record<string, Array<{ url: string; role: string; isPrimary: boolean }>> = {}
 
-      // Simulated granular stage indicators while the server streams work
-      const progressTimer = setInterval(() => {
-        setImportProgress((prev) => {
-          if (prev.percent < 85) {
-            let nextStage = prev.stage
-            if (prev.percent === 25) nextStage = "Validating SKU uniqueness and parsing olfactory pyramids..."
-            if (prev.percent === 45) nextStage = "Uploading product photography to secure storage..."
-            if (prev.percent === 65) nextStage = "Upserting parent fragrances and generating safe URLs..."
-            if (prev.percent === 80) nextStage = "Creating size and bottle variants with stock levels..."
-            return {
-              ...prev,
-              percent: prev.percent + 5,
-              stage: nextStage,
+      // A. Extract and upload images individually/in small batches to avoid multipart payload crashes
+      if (zipFile) {
+        setImportProgress({
+          percent: 15,
+          stage: "Extracting photography from ZIP archive...",
+          productsProcessed: 0,
+          variantsProcessed: 0,
+          imagesUploaded: 0,
+        })
+
+        const zip = await JSZip.loadAsync(zipFile)
+        const entriesToUpload: Array<{ sku: string; fileName: string; role: string; entry: any }> = []
+
+        for (const [rawPath, zipEntry] of Object.entries(zip.files)) {
+          if (zipEntry.dir) continue
+          const cleanPath = rawPath.replace(/^(\.\.[\/\\])+/, "")
+          const ext = cleanPath.split(".").pop()?.toLowerCase() || ""
+          if (!["jpg", "jpeg", "png", "webp"].includes(ext)) continue
+
+          const parts = cleanPath.split(/[\/\\]/).filter(Boolean)
+          let sku = ""
+          if (parts.length >= 2) {
+            const folderCandidate = parts[parts.length - 2].toUpperCase()
+            if (folderCandidate !== "PRODUCTS" && folderCandidate !== "IMAGES") {
+              sku = folderCandidate
+            } else if (parts.length >= 3) {
+              sku = parts[parts.length - 2].toUpperCase()
             }
           }
-          return prev
-        })
-      }, 700)
+          if (!sku) {
+            const fileNameOnly = parts[parts.length - 1] || ""
+            const match = fileNameOnly.match(/^([A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+)/i)
+            if (match) sku = match[1].toUpperCase()
+          }
+
+          if (sku) {
+            const lower = cleanPath.toLowerCase()
+            let role: "primary" | "secondary" | "lifestyle" = "secondary"
+            if (lower.includes("01") || lower.includes("hero") || lower.includes("front") || lower.includes("primary")) {
+              role = "primary"
+            } else if (lower.includes("lifestyle") || lower.includes("03")) {
+              role = "lifestyle"
+            }
+            entriesToUpload.push({
+              sku,
+              fileName: parts[parts.length - 1],
+              role,
+              entry: zipEntry,
+            })
+          }
+        }
+
+        let uploadedCount = 0
+        for (const item of entriesToUpload) {
+          try {
+            const blob = await item.entry.async("blob")
+            const file = new File([blob], item.fileName, { type: blob.type || "image/jpeg" })
+            const form = new FormData()
+            form.append("file", file)
+
+            const uploadRes = await fetch("/api/admin/upload", {
+              method: "POST",
+              body: form,
+            })
+            const uploadData = await uploadRes.json()
+            if (uploadRes.ok && uploadData.success && uploadData.url) {
+              if (!imageUrlsBySku[item.sku]) imageUrlsBySku[item.sku] = []
+              imageUrlsBySku[item.sku].push({
+                url: uploadData.url,
+                role: item.role,
+                isPrimary: item.role === "primary" || imageUrlsBySku[item.sku].length === 0,
+              })
+              uploadedCount++
+            }
+          } catch (uploadErr) {
+            console.warn("Image upload warning:", item.fileName, uploadErr)
+          }
+
+          const pct = Math.round(15 + (uploadedCount / Math.max(entriesToUpload.length, 1)) * 55)
+          setImportProgress({
+            percent: pct,
+            stage: `Uploading product photography (${uploadedCount} of ${entriesToUpload.length})...`,
+            productsProcessed: 0,
+            variantsProcessed: 0,
+            imagesUploaded: uploadedCount,
+          })
+        }
+      } else if (looseImages.length > 0) {
+        let uploadedCount = 0
+        for (const file of looseImages) {
+          const lower = file.name.toLowerCase()
+          const ext = file.name.split(".").pop()?.toLowerCase() || ""
+          if (!["jpg", "jpeg", "png", "webp"].includes(ext)) continue
+
+          const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+          const parts = nameWithoutExt.split(/[-_]/)
+          let sku = ""
+          if (parts.length >= 3 && parts[0].length >= 2 && parts[1].length >= 2) {
+            sku = `${parts[0]}-${parts[1]}-${parts[2]}`.toUpperCase()
+          } else if (parts.length >= 2) {
+            sku = `${parts[0]}-${parts[1]}`.toUpperCase()
+          } else {
+            sku = parts[0].toUpperCase()
+          }
+
+          let role: "primary" | "secondary" | "lifestyle" = "secondary"
+          if (lower.includes("front") || lower.includes("hero") || lower.includes("01") || lower.includes("primary")) {
+            role = "primary"
+          } else if (lower.includes("lifestyle") || lower.includes("03")) {
+            role = "lifestyle"
+          }
+
+          try {
+            const form = new FormData()
+            form.append("file", file)
+            const uploadRes = await fetch("/api/admin/upload", {
+              method: "POST",
+              body: form,
+            })
+            const uploadData = await uploadRes.json()
+            if (uploadRes.ok && uploadData.success && uploadData.url) {
+              if (!imageUrlsBySku[sku]) imageUrlsBySku[sku] = []
+              imageUrlsBySku[sku].push({
+                url: uploadData.url,
+                role,
+                isPrimary: role === "primary" || imageUrlsBySku[sku].length === 0,
+              })
+              uploadedCount++
+            }
+          } catch (uploadErr) {
+            console.warn("Loose image upload warning:", file.name, uploadErr)
+          }
+
+          const pct = Math.round(15 + (uploadedCount / Math.max(looseImages.length, 1)) * 55)
+          setImportProgress({
+            percent: pct,
+            stage: `Uploading product photography (${uploadedCount} of ${looseImages.length})...`,
+            productsProcessed: 0,
+            variantsProcessed: 0,
+            imagesUploaded: uploadedCount,
+          })
+        }
+      }
+
+      // B. Upsert parent products and variants in database
+      setImportProgress((prev) => ({
+        ...prev,
+        percent: 75,
+        stage: "Upserting parent fragrances and creating size variants...",
+      }))
 
       const res = await fetch("/api/admin/catalog/import", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          spreadsheetBase64,
+          spreadsheetFileName: spreadsheetFile.name,
+          imageUrlsBySku,
+          adminEmail: "admin@snattarwala.com",
+        }),
       })
-
-      clearInterval(progressTimer)
 
       const data = await res.json()
 

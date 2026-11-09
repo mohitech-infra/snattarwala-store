@@ -8,7 +8,7 @@ import {
 } from "@/lib/catalog-import-service"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 60 // 60s timeout for large uploads
+export const maxDuration = 60
 
 function getMimeType(fileName: string): string {
   const ext = fileName.split(".").pop()?.toLowerCase() || ""
@@ -67,12 +67,109 @@ function parseLooseImageFile(file: File, buffer: Buffer): ExtractedImage | null 
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData()
-    const spreadsheetFile = formData.get("spreadsheet") as File | null
-    const imagesZipFile = formData.get("imagesZip") as File | null
-    const looseImageFiles = formData.getAll("images") as File[]
+    const contentType = req.headers.get("content-type") || ""
+    let spreadsheetBuffer: Buffer | null = null
+    let imagesBySku: Record<string, ExtractedImage[]> = {}
 
-    if (!spreadsheetFile) {
+    // MODE A: JSON PAYLOAD (Recommended - immune to Undici multipart bugs & body size limits)
+    if (contentType.includes("application/json")) {
+      const body = await req.json()
+      if (body.spreadsheetBase64) {
+        spreadsheetBuffer = Buffer.from(body.spreadsheetBase64, "base64")
+      }
+
+      if (Array.isArray(body.imageManifest)) {
+        for (const item of body.imageManifest) {
+          const sku = (item.sku || "").toUpperCase().trim()
+          if (!sku) continue
+          if (!imagesBySku[sku]) {
+            imagesBySku[sku] = []
+          }
+          imagesBySku[sku].push({
+            fileName: item.fileName,
+            path: item.path || item.fileName,
+            sku,
+            role: item.role || "secondary",
+            buffer: Buffer.alloc(0),
+            mimeType: getMimeType(item.fileName),
+            sizeBytes: item.sizeBytes || 0,
+          })
+        }
+      }
+    } else {
+      // MODE B: MULTIPART FORM-DATA (Fallback)
+      let formData: FormData
+      try {
+        formData = await req.formData()
+      } catch (formParseErr: any) {
+        console.warn("req.formData() parsing failed, possible size limit:", formParseErr)
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to parse upload form data. Please ensure file sizes are within limits, or use the updated bulk uploader.",
+          },
+          { status: 400 }
+        )
+      }
+
+      const spreadsheetFile = formData.get("spreadsheet") as File | null
+      const imagesZipFile = formData.get("imagesZip") as File | null
+      const looseImageFiles = formData.getAll("images") as File[]
+      const imageManifestRaw = formData.get("imageManifest") as string | null
+
+      if (spreadsheetFile) {
+        spreadsheetBuffer = Buffer.from(await spreadsheetFile.arrayBuffer())
+      }
+
+      // Check for client-side imageManifest
+      if (imageManifestRaw) {
+        try {
+          const manifest: Array<{ fileName: string; path?: string; sku: string; role?: string }> =
+            JSON.parse(imageManifestRaw)
+          for (const item of manifest) {
+            const sku = (item.sku || "").toUpperCase().trim()
+            if (!sku) continue
+            if (!imagesBySku[sku]) imagesBySku[sku] = []
+            imagesBySku[sku].push({
+              fileName: item.fileName,
+              path: item.path || item.fileName,
+              sku,
+              role: (item.role as any) || "secondary",
+              buffer: Buffer.alloc(0),
+              mimeType: getMimeType(item.fileName),
+              sizeBytes: 0,
+            })
+          }
+        } catch (err) {
+          console.warn("Could not parse imageManifest JSON:", err)
+        }
+      }
+
+      // Parse ZIP if provided and manifest wasn't passed
+      if (Object.keys(imagesBySku).length === 0 && imagesZipFile && imagesZipFile.size > 0) {
+        const zipBuffer = Buffer.from(await imagesZipFile.arrayBuffer())
+        imagesBySku = await parseImageZip(zipBuffer)
+      }
+
+      // Parse loose images if provided and manifest wasn't passed
+      if (Object.keys(imagesBySku).length === 0 && looseImageFiles && looseImageFiles.length > 0) {
+        for (const imgFile of looseImageFiles) {
+          if (!imgFile || imgFile.size === 0) continue
+          const imgBuf = Buffer.from(await imgFile.arrayBuffer())
+          const parsedImg = parseLooseImageFile(imgFile, imgBuf)
+          if (parsedImg) {
+            if (!imagesBySku[parsedImg.sku]) {
+              imagesBySku[parsedImg.sku] = []
+            }
+            if (!imagesBySku[parsedImg.sku].some((x) => x.fileName === parsedImg.fileName)) {
+              imagesBySku[parsedImg.sku].push(parsedImg)
+            }
+          }
+        }
+      }
+    }
+
+    if (!spreadsheetBuffer || spreadsheetBuffer.length === 0) {
       return NextResponse.json(
         { success: false, error: "Please upload an Excel (.xlsx) or CSV (.csv) spreadsheet file." },
         { status: 400 }
@@ -80,37 +177,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Parse spreadsheet
-    const spreadsheetBuffer = Buffer.from(await spreadsheetFile.arrayBuffer())
     const { parents, variants } = parseSpreadsheet(spreadsheetBuffer)
-
-    // 2. Parse images (either ZIP or loose images)
-    let imagesBySku: Record<string, ExtractedImage[]> = {}
-
-    if (imagesZipFile && imagesZipFile.size > 0) {
-      const zipBuffer = Buffer.from(await imagesZipFile.arrayBuffer())
-      imagesBySku = await parseImageZip(zipBuffer)
-    }
-
-    // Also include any loose uploaded images
-    if (looseImageFiles && looseImageFiles.length > 0) {
-      for (const imgFile of looseImageFiles) {
-        if (!imgFile || imgFile.size === 0) continue
-        const imgBuf = Buffer.from(await imgFile.arrayBuffer())
-        const parsedImg = parseLooseImageFile(imgFile, imgBuf)
-        if (parsedImg) {
-          if (!imagesBySku[parsedImg.sku]) {
-            imagesBySku[parsedImg.sku] = []
-          }
-          if (!imagesBySku[parsedImg.sku].some((x) => x.fileName === parsedImg.fileName)) {
-            imagesBySku[parsedImg.sku].push(parsedImg)
-          }
-        }
-      }
-    }
 
     const totalImages = Object.values(imagesBySku).reduce((sum, list) => sum + list.length, 0)
 
-    // 3. Run full validation (async)
+    // 2. Run full validation (async)
     const validation = await validateCatalogue(parents, variants, imagesBySku)
     const errorCsv = generateErrorReportCsv(validation.issues)
 

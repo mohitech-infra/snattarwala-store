@@ -7,7 +7,7 @@ import {
 } from "@/lib/catalog-import-service"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 120 // 2 minutes for processing & uploads
+export const maxDuration = 120
 
 function getMimeType(fileName: string): string {
   const ext = fileName.split(".").pop()?.toLowerCase() || ""
@@ -66,13 +66,92 @@ function parseLooseImageFile(file: File, buffer: Buffer): ExtractedImage | null 
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData()
-    const spreadsheetFile = formData.get("spreadsheet") as File | null
-    const imagesZipFile = formData.get("imagesZip") as File | null
-    const looseImageFiles = formData.getAll("images") as File[]
-    const adminEmail = (formData.get("adminEmail") as string) || "admin@snattarwala.com"
+    const contentType = req.headers.get("content-type") || ""
+    let spreadsheetBuffer: Buffer | null = null
+    let spreadsheetFileName = "catalogue.xlsx"
+    let spreadsheetSizeBytes = 0
+    let adminEmail = "admin@snattarwala.com"
+    let imageUrlsBySku: Record<string, Array<{ url: string; isPrimary?: boolean; role?: string }>> | undefined = undefined
+    let imagesBySku: Record<string, ExtractedImage[]> = {}
 
-    if (!spreadsheetFile) {
+    // MODE A: JSON PAYLOAD
+    if (contentType.includes("application/json")) {
+      const body = await req.json()
+      if (body.spreadsheetBase64) {
+        spreadsheetBuffer = Buffer.from(body.spreadsheetBase64, "base64")
+        spreadsheetSizeBytes = spreadsheetBuffer.length
+      }
+      if (body.spreadsheetFileName) {
+        spreadsheetFileName = body.spreadsheetFileName
+      }
+      if (body.adminEmail) {
+        adminEmail = body.adminEmail
+      }
+      if (body.imageUrlsBySku) {
+        imageUrlsBySku = body.imageUrlsBySku
+      }
+    } else {
+      // MODE B: MULTIPART FORM-DATA
+      let formData: FormData
+      try {
+        formData = await req.formData()
+      } catch (formErr: any) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to parse form data. Payload may exceed server limits.",
+          },
+          { status: 400 }
+        )
+      }
+
+      const spreadsheetFile = formData.get("spreadsheet") as File | null
+      const imagesZipFile = formData.get("imagesZip") as File | null
+      const looseImageFiles = formData.getAll("images") as File[]
+      const imageUrlsBySkuRaw = formData.get("imageUrlsBySku") as string | null
+
+      if (spreadsheetFile) {
+        spreadsheetBuffer = Buffer.from(await spreadsheetFile.arrayBuffer())
+        spreadsheetFileName = (formData.get("originalFileName") as string) || spreadsheetFile.name
+        spreadsheetSizeBytes = spreadsheetFile.size
+      }
+
+      if (formData.get("adminEmail")) {
+        adminEmail = formData.get("adminEmail") as string
+      }
+
+      if (imageUrlsBySkuRaw) {
+        try {
+          imageUrlsBySku = JSON.parse(imageUrlsBySkuRaw)
+        } catch (e) {
+          console.warn("Could not parse imageUrlsBySku JSON:", e)
+        }
+      }
+
+      // If no pre-uploaded URLs, parse ZIP or loose files
+      if (!imageUrlsBySku && imagesZipFile && imagesZipFile.size > 0) {
+        const zipBuffer = Buffer.from(await imagesZipFile.arrayBuffer())
+        imagesBySku = await parseImageZip(zipBuffer)
+      }
+
+      if (!imageUrlsBySku && looseImageFiles && looseImageFiles.length > 0) {
+        for (const imgFile of looseImageFiles) {
+          if (!imgFile || imgFile.size === 0) continue
+          const imgBuf = Buffer.from(await imgFile.arrayBuffer())
+          const parsedImg = parseLooseImageFile(imgFile, imgBuf)
+          if (parsedImg) {
+            if (!imagesBySku[parsedImg.sku]) {
+              imagesBySku[parsedImg.sku] = []
+            }
+            if (!imagesBySku[parsedImg.sku].some((x) => x.fileName === parsedImg.fileName)) {
+              imagesBySku[parsedImg.sku].push(parsedImg)
+            }
+          }
+        }
+      }
+    }
+
+    if (!spreadsheetBuffer || spreadsheetBuffer.length === 0) {
       return NextResponse.json(
         { success: false, error: "Spreadsheet file is required for import." },
         { status: 400 }
@@ -80,7 +159,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Parse spreadsheet
-    const spreadsheetBuffer = Buffer.from(await spreadsheetFile.arrayBuffer())
     const { parents, variants } = parseSpreadsheet(spreadsheetBuffer)
 
     if (parents.length === 0) {
@@ -90,39 +168,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2. Parse images
-    let imagesBySku: Record<string, ExtractedImage[]> = {}
-
-    if (imagesZipFile && imagesZipFile.size > 0) {
-      const zipBuffer = Buffer.from(await imagesZipFile.arrayBuffer())
-      imagesBySku = await parseImageZip(zipBuffer)
-    }
-
-    if (looseImageFiles && looseImageFiles.length > 0) {
-      for (const imgFile of looseImageFiles) {
-        if (!imgFile || imgFile.size === 0) continue
-        const imgBuf = Buffer.from(await imgFile.arrayBuffer())
-        const parsedImg = parseLooseImageFile(imgFile, imgBuf)
-        if (parsedImg) {
-          if (!imagesBySku[parsedImg.sku]) {
-            imagesBySku[parsedImg.sku] = []
-          }
-          if (!imagesBySku[parsedImg.sku].some((x) => x.fileName === parsedImg.fileName)) {
-            imagesBySku[parsedImg.sku].push(parsedImg)
-          }
-        }
-      }
-    }
-
-    // 3. Execute idempotent database import
+    // 2. Execute idempotent database import
     const result = await executeCatalogueImport(
       parents,
       variants,
       imagesBySku,
       {
         adminEmail,
-        fileName: spreadsheetFile.name,
-        fileSizeBytes: spreadsheetFile.size,
+        fileName: spreadsheetFileName,
+        fileSizeBytes: spreadsheetSizeBytes,
+        imageUrlsBySku,
       }
     )
 

@@ -19,6 +19,9 @@ const nextConfig: NextConfig = {
     pagesBufferLength: 2,
   },
   experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
     // Restrict worker counts based on available system memory to prevent freezing
     memoryBasedWorkersCount: true,
     // Optimize heavy packages so Next.js only transforms and holds imported items in RAM
