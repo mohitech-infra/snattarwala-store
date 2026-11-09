@@ -45,13 +45,15 @@ export interface RawVariant {
   size: string
   sizeUnit?: string
   bottleType: string
-  price: number
+  price: number | null
   compareAtPrice?: number | null
   costPrice?: number | null
   stock: number
   reorderLevel?: number
   isDefault?: boolean
   status?: string
+  includeVariant: boolean
+  variantImageUrl?: string
 }
 
 export interface ExtractedImage {
@@ -128,9 +130,304 @@ function getSupabase() {
 /**
  * Normalizes header keys to standard names
  */
-function cleanKey(key: string): string {
-  return key.trim().toLowerCase().replace(/[^a-z0-9]/g, "")
+export function cleanKey(key: string): string {
+  return String(key || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
 }
+
+/**
+ * Returns the first matching value from a cleaned dictionary given an array of aliases
+ */
+export function getFirstMatchingValue(rowDict: Record<string, any>, aliases: string[]): any {
+  for (const alias of aliases) {
+    const cleaned = cleanKey(alias)
+    if (rowDict[cleaned] !== undefined && rowDict[cleaned] !== null && rowDict[cleaned] !== "") {
+      return rowDict[cleaned]
+    }
+  }
+  return undefined
+}
+
+/**
+ * Parses numeric currency / string / number values safely.
+ * Returns null if blank, empty or invalid (never silently coerces undefined or "" to 0).
+ */
+export function parseNumericValue(val: any): number | null {
+  if (val === undefined || val === null) return null
+  if (typeof val === "number") {
+    return isNaN(val) ? null : val
+  }
+  const str = String(val).trim()
+  if (!str) return null
+
+  // Remove currency symbols (₹, $, Rs, INR, etc.), spaces, and commas
+  const cleaned = str
+    .replace(/[₹$,]/g, "")
+    .replace(/\b(inr|rs\.?)\b/gi, "")
+    .trim()
+
+  if (!cleaned) return null
+  const num = Number(cleaned)
+  return isNaN(num) ? null : num
+}
+
+/**
+ * Parses IncludeVariant boolean.
+ * Accepts "yes", "y", "true", "1", true (case-insensitive).
+ * Missing / empty / "no" / "false" returns false.
+ */
+export function parseIncludeVariant(val: any): boolean {
+  if (val === undefined || val === null) return false
+  if (typeof val === "boolean") return val
+  const str = String(val).trim().toLowerCase()
+  return str === "yes" || str === "y" || str === "true" || str === "1"
+}
+
+// ====================================================================
+// ROBUST HEADER ALIAS DICTIONARIES (PHASE 2 & BUG FIX)
+// ====================================================================
+export const SELLING_PRICE_ALIASES = [
+  "SellingPriceINR",
+  "SellingPrice",
+  "Selling Price",
+  "Selling Price (INR)",
+  "Selling Price INR",
+  "selling_price",
+  "selling_price_inr",
+  "PriceINR",
+  "Price (INR)",
+  "Price",
+  "price",
+  "OfferPrice",
+  "SpecialPrice"
+]
+
+export const MRP_ALIASES = [
+  "MRPINR",
+  "MRP",
+  "M.R.P.",
+  "MRP (INR)",
+  "mrp_inr",
+  "CompareAtPrice",
+  "Compare At Price",
+  "compare_at_price",
+  "RegularPrice",
+  "ListPrice",
+  "RetailPrice",
+  "MaximumRetailPrice"
+]
+
+export const COST_PRICE_ALIASES = [
+  "CostPriceINR",
+  "CostPrice",
+  "Cost Price",
+  "Cost Price (INR)",
+  "Cost Price INR",
+  "cost_price",
+  "cost_price_inr",
+  "Cost",
+  "UnitCost"
+]
+
+export const STOCK_ALIASES = [
+  "StockUnits",
+  "Stock Units",
+  "Stock",
+  "Quantity",
+  "Inventory",
+  "Qty",
+  "StockQuantity",
+  "stock_units",
+  "stock_quantity"
+]
+
+export const LOW_STOCK_ALIASES = [
+  "LowStockAlertUnits",
+  "Low Stock Alert Units",
+  "LowStockAlert",
+  "Low Stock Alert",
+  "LowStock",
+  "ReorderLevel",
+  "Reorder Level",
+  "low_stock_alert",
+  "reorder_level",
+  "MinStock",
+  "AlertThreshold"
+]
+
+export const PARENT_SKU_ALIASES = [
+  "ParentProductSKU",
+  "Parent Product SKU",
+  "ParentProductSku",
+  "ParentSKU",
+  "Parent SKU",
+  "parent_product_sku",
+  "parent_sku",
+  "ProductSKU",
+  "Product SKU",
+  "product_sku",
+  "SKU",
+  "Parent"
+]
+
+export const VARIANT_SKU_ALIASES = [
+  "VariantSKU",
+  "Variant SKU",
+  "VariantSku",
+  "variant_sku",
+  "ItemSKU",
+  "SKU",
+  "sku"
+]
+
+export const SIZE_ALIASES = [
+  "SizeName",
+  "Size Name",
+  "Size",
+  "Volume",
+  "BottleSize",
+  "Bottle Size",
+  "Capacity",
+  "size_name"
+]
+
+export const SIZE_UNIT_ALIASES = [
+  "SizeUnit",
+  "Size Unit",
+  "Unit",
+  "size_unit",
+  "MeasurementUnit"
+]
+
+export const BOTTLE_TYPE_ALIASES = [
+  "BottleType",
+  "Bottle Type",
+  "bottle_type",
+  "Bottle",
+  "Packaging",
+  "ContainerType",
+  "Type"
+]
+
+export const INCLUDE_VARIANT_ALIASES = [
+  "IncludeVariant",
+  "Include Variant",
+  "Include",
+  "IncludeVariant?",
+  "include_variant",
+  "Active",
+  "Enabled",
+  "Selected"
+]
+
+export const IS_DEFAULT_ALIASES = [
+  "IsDefault",
+  "Is Default",
+  "DefaultVariant",
+  "Default Variant",
+  "is_default",
+  "default_variant",
+  "Default",
+  "PrimaryVariant"
+]
+
+export const VARIANT_STATUS_ALIASES = [
+  "VariantStatus",
+  "Variant Status",
+  "variant_status",
+  "Status",
+  "PublishStatus"
+]
+
+export const VARIANT_IMAGE_URL_ALIASES = [
+  "VariantImageURL",
+  "Variant Image URL",
+  "VariantImageUrl",
+  "Variant Image Url",
+  "VariantImage",
+  "ImageURL",
+  "Image URL",
+  "ImageUrl",
+  "PhotoURL",
+  "Image"
+]
+
+// Parent sheet aliases
+export const PARENT_PRODUCT_SKU_ALIASES = [
+  "ProductSKU",
+  "Product SKU",
+  "ParentProductSKU",
+  "Parent Product SKU",
+  "SKU",
+  "ParentSKU",
+  "Parent SKU",
+  "product_sku",
+  "parent_sku"
+]
+
+export const FRAGRANCE_NAME_ALIASES = [
+  "FragranceName",
+  "Fragrance Name",
+  "ProductName",
+  "Product Name",
+  "Name",
+  "Title",
+  "PerfumeName"
+]
+
+export const CATEGORY_ALIASES = [
+  "Category",
+  "CategoryName",
+  "ProductCategory",
+  "Collection"
+]
+
+export const SERIES_ALIASES = [
+  "FragranceSeries",
+  "Fragrance Series",
+  "Series",
+  "ProductSeries",
+  "CollectionName"
+]
+
+export const GENDER_ALIASES = [
+  "Gender",
+  "TargetGender",
+  "For"
+]
+
+export const FRAGRANCE_FAMILY_ALIASES = [
+  "FragranceFamily",
+  "Fragrance Family",
+  "Family",
+  "OlfactiveFamily",
+  "ScentFamily"
+]
+
+export const SHORT_DESC_ALIASES = [
+  "ShortDescription",
+  "Short Description",
+  "Tagline",
+  "Summary",
+  "BriefDescription"
+]
+
+export const FULL_DESC_ALIASES = [
+  "FullDescription",
+  "Full Description",
+  "Description",
+  "ProductDescription",
+  "LongDescription",
+  "Story"
+]
+
+export const TOP_NOTES_ALIASES = ["TopNotes", "Top Notes", "Top", "HeadNotes"]
+export const HEART_NOTES_ALIASES = ["HeartNotes", "Heart Notes", "Heart", "MiddleNotes", "Middle Notes", "Middle"]
+export const BASE_NOTES_ALIASES = ["BaseNotes", "Base Notes", "Base", "BottomNotes"]
+export const BRAND_ALIASES = ["Brand", "BrandName", "Manufacturer"]
+export const PUBLISH_STATUS_ALIASES = ["PublishStatus", "Publish Status", "Status", "ProductStatus"]
 
 // ====================================================================
 // 1. EXCEL TEMPLATE GENERATOR (PHASE 1 & 2)
@@ -388,24 +685,24 @@ export function parseSpreadsheet(buffer: Buffer): { parents: RawParentProduct[];
         return acc
       }, {} as Record<string, any>)
 
-      const sku = String(keys["productsku"] || keys["sku"] || keys["parentsku"] || "").trim()
-      const name = String(keys["fragrancename"] || keys["name"] || keys["productname"] || "").trim()
+      const sku = String(getFirstMatchingValue(keys, PARENT_PRODUCT_SKU_ALIASES) || "").trim()
+      const name = String(getFirstMatchingValue(keys, FRAGRANCE_NAME_ALIASES) || "").trim()
 
       return {
         rowNumber: idx + 2,
         sku,
         name,
-        category: String(keys["category"] || "Attars").trim(),
-        series: String(keys["fragranceseries"] || keys["series"] || "").trim() || undefined,
-        gender: String(keys["gender"] || "Unisex").trim(),
-        fragranceFamily: String(keys["fragrancefamily"] || keys["family"] || "").trim() || undefined,
-        shortDescription: String(keys["shortdescription"] || keys["tagline"] || "").trim() || undefined,
-        description: String(keys["fulldescription"] || keys["description"] || "").trim() || undefined,
-        topNotes: String(keys["topnotes"] || keys["top"] || "").trim() || undefined,
-        heartNotes: String(keys["heartnotes"] || keys["middle"] || keys["heart"] || "").trim() || undefined,
-        baseNotes: String(keys["basenotes"] || keys["base"] || "").trim() || undefined,
-        brand: String(keys["brand"] || "SN AttarWala").trim(),
-        publishStatus: String(keys["publishstatus"] || keys["status"] || "Draft").trim()
+        category: String(getFirstMatchingValue(keys, CATEGORY_ALIASES) || "Attars").trim(),
+        series: String(getFirstMatchingValue(keys, SERIES_ALIASES) || "").trim() || undefined,
+        gender: String(getFirstMatchingValue(keys, GENDER_ALIASES) || "Unisex").trim(),
+        fragranceFamily: String(getFirstMatchingValue(keys, FRAGRANCE_FAMILY_ALIASES) || "").trim() || undefined,
+        shortDescription: String(getFirstMatchingValue(keys, SHORT_DESC_ALIASES) || "").trim() || undefined,
+        description: String(getFirstMatchingValue(keys, FULL_DESC_ALIASES) || "").trim() || undefined,
+        topNotes: String(getFirstMatchingValue(keys, TOP_NOTES_ALIASES) || "").trim() || undefined,
+        heartNotes: String(getFirstMatchingValue(keys, HEART_NOTES_ALIASES) || "").trim() || undefined,
+        baseNotes: String(getFirstMatchingValue(keys, BASE_NOTES_ALIASES) || "").trim() || undefined,
+        brand: String(getFirstMatchingValue(keys, BRAND_ALIASES) || "SN AttarWala").trim(),
+        publishStatus: String(getFirstMatchingValue(keys, PUBLISH_STATUS_ALIASES) || "Draft").trim()
       }
     }).filter(p => p.sku || p.name)
 
@@ -418,31 +715,55 @@ export function parseSpreadsheet(buffer: Buffer): { parents: RawParentProduct[];
         return acc
       }, {} as Record<string, any>)
 
-      const parentSku = String(keys["parentproductsku"] || keys["parentsku"] || keys["productsku"] || "").trim()
-      const variantSku = String(keys["variantsku"] || keys["sku"] || "").trim()
-      const size = String(keys["size"] || "").trim()
-      const bottleType = String(keys["bottletype"] || keys["bottle"] || "Roll-On").trim()
-      const price = Number(keys["sellingprice"] || keys["price"] || 0)
-      const compareAtPrice = keys["mrp"] || keys["compareatprice"] ? Number(keys["mrp"] || keys["compareatprice"]) : null
-      const costPrice = keys["costprice"] ? Number(keys["costprice"]) : null
-      const stock = Number(keys["stock"] || keys["quantity"] || 0)
-      const lowStockAlert = keys["lowstockalert"] || keys["reorderlevel"] ? Number(keys["lowstockalert"] || keys["reorderlevel"]) : 5
-      const isDefault = String(keys["defaultvariant"] || keys["isdefault"] || "").toLowerCase().startsWith("y")
+      const parentSku = String(getFirstMatchingValue(keys, PARENT_SKU_ALIASES) || "").trim()
+      const variantSku = String(getFirstMatchingValue(keys, VARIANT_SKU_ALIASES) || "").trim()
+      const size = String(getFirstMatchingValue(keys, SIZE_ALIASES) || "").trim()
+      const sizeUnit = String(getFirstMatchingValue(keys, SIZE_UNIT_ALIASES) || "ml").trim()
+      const bottleType = String(getFirstMatchingValue(keys, BOTTLE_TYPE_ALIASES) || "Roll-On").trim()
+      
+      const rawPrice = getFirstMatchingValue(keys, SELLING_PRICE_ALIASES)
+      const price = parseNumericValue(rawPrice)
+
+      const rawMrp = getFirstMatchingValue(keys, MRP_ALIASES)
+      const compareAtPrice = parseNumericValue(rawMrp)
+
+      const rawCost = getFirstMatchingValue(keys, COST_PRICE_ALIASES)
+      const costPrice = parseNumericValue(rawCost)
+
+      const rawStock = getFirstMatchingValue(keys, STOCK_ALIASES)
+      const stock = parseNumericValue(rawStock) ?? 0
+
+      const rawLowStock = getFirstMatchingValue(keys, LOW_STOCK_ALIASES)
+      const reorderLevel = parseNumericValue(rawLowStock) ?? 5
+
+      const rawInclude = getFirstMatchingValue(keys, INCLUDE_VARIANT_ALIASES)
+      const includeVariant = parseIncludeVariant(rawInclude)
+
+      const rawDefault = getFirstMatchingValue(keys, IS_DEFAULT_ALIASES)
+      const isDefault = String(rawDefault || "").toLowerCase().startsWith("y") || rawDefault === true || rawDefault === 1
+
+      const rawStatus = getFirstMatchingValue(keys, VARIANT_STATUS_ALIASES)
+      const status = String(rawStatus || "Active").trim()
+
+      const rawImg = getFirstMatchingValue(keys, VARIANT_IMAGE_URL_ALIASES)
+      const variantImageUrl = rawImg ? String(rawImg).trim() : undefined
 
       return {
         rowNumber: idx + 2,
         parentSku,
-        variantSku: variantSku || `${parentSku}-${size}-${bottleType.slice(0, 3).toUpperCase()}`,
+        variantSku: variantSku || `${parentSku}-${size || "6ml"}-${bottleType.slice(0, 3).toUpperCase()}`,
         size: size || "6ml",
-        sizeUnit: String(keys["sizeunit"] || "ml").trim(),
+        sizeUnit: sizeUnit || "ml",
         bottleType: bottleType || "Roll-On",
         price,
         compareAtPrice,
         costPrice,
-        stock: isNaN(stock) ? 0 : stock,
-        reorderLevel: isNaN(lowStockAlert) ? 5 : lowStockAlert,
+        stock,
+        reorderLevel,
         isDefault,
-        status: String(keys["variantstatus"] || "Active").trim()
+        status,
+        includeVariant,
+        variantImageUrl
       }
     }).filter(v => v.parentSku || v.size)
 
@@ -459,48 +780,55 @@ export function parseSpreadsheet(buffer: Buffer): { parents: RawParentProduct[];
         return acc
       }, {} as Record<string, any>)
 
-      const parentSku = String(keys["parentsku"] || keys["productsku"] || keys["sku"] || "").trim()
-      const name = String(keys["fragrancename"] || keys["name"] || keys["productname"] || "").trim()
+      const parentSku = String(getFirstMatchingValue(keys, PARENT_PRODUCT_SKU_ALIASES) || "").trim()
+      const name = String(getFirstMatchingValue(keys, FRAGRANCE_NAME_ALIASES) || "").trim()
 
       if (parentSku && !parentsMap[parentSku]) {
         parentsMap[parentSku] = {
           rowNumber: idx + 2,
           sku: parentSku,
           name: name || parentSku,
-          category: String(keys["category"] || "Attars").trim(),
-          series: String(keys["fragranceseries"] || keys["series"] || "").trim() || undefined,
-          gender: String(keys["gender"] || "Unisex").trim(),
-          fragranceFamily: String(keys["fragrancefamily"] || keys["family"] || "").trim() || undefined,
-          shortDescription: String(keys["shortdescription"] || "").trim() || undefined,
-          description: String(keys["description"] || keys["fulldescription"] || "").trim() || undefined,
-          topNotes: String(keys["topnotes"] || keys["top"] || "").trim() || undefined,
-          heartNotes: String(keys["heartnotes"] || keys["middle"] || "").trim() || undefined,
-          baseNotes: String(keys["basenotes"] || keys["base"] || "").trim() || undefined,
-          brand: String(keys["brand"] || "SN AttarWala").trim(),
-          publishStatus: String(keys["publishstatus"] || "Draft").trim()
+          category: String(getFirstMatchingValue(keys, CATEGORY_ALIASES) || "Attars").trim(),
+          series: String(getFirstMatchingValue(keys, SERIES_ALIASES) || "").trim() || undefined,
+          gender: String(getFirstMatchingValue(keys, GENDER_ALIASES) || "Unisex").trim(),
+          fragranceFamily: String(getFirstMatchingValue(keys, FRAGRANCE_FAMILY_ALIASES) || "").trim() || undefined,
+          shortDescription: String(getFirstMatchingValue(keys, SHORT_DESC_ALIASES) || "").trim() || undefined,
+          description: String(getFirstMatchingValue(keys, FULL_DESC_ALIASES) || "").trim() || undefined,
+          topNotes: String(getFirstMatchingValue(keys, TOP_NOTES_ALIASES) || "").trim() || undefined,
+          heartNotes: String(getFirstMatchingValue(keys, HEART_NOTES_ALIASES) || "").trim() || undefined,
+          baseNotes: String(getFirstMatchingValue(keys, BASE_NOTES_ALIASES) || "").trim() || undefined,
+          brand: String(getFirstMatchingValue(keys, BRAND_ALIASES) || "SN AttarWala").trim(),
+          publishStatus: String(getFirstMatchingValue(keys, PUBLISH_STATUS_ALIASES) || "Draft").trim()
         }
       }
 
       // If variant fields exist on the row
-      const size = String(keys["size"] || "6ml").trim()
-      const price = Number(keys["sellingprice"] || keys["price"] || 0)
-      if (parentSku && (size || price > 0)) {
-        const bottleType = String(keys["bottletype"] || keys["bottle"] || "Roll-On").trim()
-        const variantSku = String(keys["variantsku"] || "").trim() || `${parentSku}-${size}-${bottleType.slice(0, 3).toUpperCase()}`
+      const size = String(getFirstMatchingValue(keys, SIZE_ALIASES) || "6ml").trim()
+      const rawPrice = getFirstMatchingValue(keys, SELLING_PRICE_ALIASES)
+      const price = parseNumericValue(rawPrice)
+      
+      const rawInclude = getFirstMatchingValue(keys, INCLUDE_VARIANT_ALIASES)
+      const includeVariant = rawInclude !== undefined ? parseIncludeVariant(rawInclude) : true
+
+      if (parentSku && (size || (price !== null && price > 0))) {
+        const bottleType = String(getFirstMatchingValue(keys, BOTTLE_TYPE_ALIASES) || "Roll-On").trim()
+        const variantSku = String(getFirstMatchingValue(keys, VARIANT_SKU_ALIASES) || "").trim() || `${parentSku}-${size}-${bottleType.slice(0, 3).toUpperCase()}`
         variants.push({
           rowNumber: idx + 2,
           parentSku,
           variantSku,
           size,
-          sizeUnit: String(keys["sizeunit"] || "ml").trim(),
+          sizeUnit: String(getFirstMatchingValue(keys, SIZE_UNIT_ALIASES) || "ml").trim(),
           bottleType,
           price,
-          compareAtPrice: keys["mrp"] ? Number(keys["mrp"]) : null,
-          costPrice: keys["costprice"] ? Number(keys["costprice"]) : null,
-          stock: Number(keys["stock"] || 20),
-          reorderLevel: 5,
+          compareAtPrice: parseNumericValue(getFirstMatchingValue(keys, MRP_ALIASES)),
+          costPrice: parseNumericValue(getFirstMatchingValue(keys, COST_PRICE_ALIASES)),
+          stock: parseNumericValue(getFirstMatchingValue(keys, STOCK_ALIASES)) ?? 20,
+          reorderLevel: parseNumericValue(getFirstMatchingValue(keys, LOW_STOCK_ALIASES)) ?? 5,
           isDefault: variants.filter(v => v.parentSku === parentSku).length === 0,
-          status: "Active"
+          status: String(getFirstMatchingValue(keys, VARIANT_STATUS_ALIASES) || "Active").trim(),
+          includeVariant,
+          variantImageUrl: getFirstMatchingValue(keys, VARIANT_IMAGE_URL_ALIASES)
         })
       }
     })
@@ -524,10 +852,32 @@ export function parseSpreadsheet(buffer: Buffer): { parents: RawParentProduct[];
         stock: 20,
         reorderLevel: 5,
         isDefault: true,
-        status: "Active"
+        status: "Active",
+        includeVariant: true
       })
     }
   })
+
+  // SECTION 6: Required debugging output before validation stage
+  if (variants.length > 0) {
+    const firstV = variants[0]
+    const debugFirstVariant = {
+      ParentProductSKU: firstV.parentSku,
+      IncludeVariant: firstV.includeVariant ? "Yes" : "No",
+      VariantSKU: firstV.variantSku,
+      SellingPriceINR: firstV.price,
+      MRPINR: firstV.compareAtPrice,
+      StockUnits: firstV.stock
+    }
+    console.log("First parsed variant:\n" + JSON.stringify(debugFirstVariant, null, 2))
+
+    // Stop and report mapping issue if price parsing fails on included variant
+    if (firstV.includeVariant && (firstV.price === null || firstV.price <= 0)) {
+      throw new Error(
+        `Price mapping issue detected for first variant (${firstV.variantSku}): parsed SellingPriceINR is ${firstV.price}. Expected positive numeric selling price.`
+      )
+    }
+  }
 
   return { parents, variants }
 }
@@ -652,6 +1002,26 @@ export async function validateCatalogue(
   const issues: ValidationIssue[] = []
   const supabase = getSupabase()
 
+  // SECTION 6: Required debugging output before validation stage
+  if (variants.length > 0) {
+    const firstV = variants[0]
+    const debugFirstVariant = {
+      ParentProductSKU: firstV.parentSku,
+      IncludeVariant: firstV.includeVariant ? "Yes" : "No",
+      VariantSKU: firstV.variantSku,
+      SellingPriceINR: firstV.price,
+      MRPINR: firstV.compareAtPrice,
+      StockUnits: firstV.stock
+    }
+    console.log("Validation Stage - First parsed variant:\n" + JSON.stringify(debugFirstVariant, null, 2))
+
+    if (firstV.includeVariant && (firstV.price === null || firstV.price <= 0)) {
+      throw new Error(
+        `Price mapping issue detected for first variant (${firstV.variantSku}): parsed SellingPriceINR is ${firstV.price}. Expected positive numeric selling price.`
+      )
+    }
+  }
+
   // Fetch existing SKUs from DB to detect duplicates or updates
   let existingDbSkus: Set<string> = new Set()
   try {
@@ -734,6 +1104,11 @@ export async function validateCatalogue(
   const seenVariantSkus = new Set<string>()
 
   variants.forEach(v => {
+    // PHASE 4 RULE: Skip unincluded variants without price or required-field errors
+    if (!v.includeVariant) {
+      return
+    }
+
     if (!v.parentSku) {
       issues.push({
         rowType: "Variant",
@@ -789,18 +1164,18 @@ export async function validateCatalogue(
       })
     }
 
-    if (!v.price || v.price <= 0 || isNaN(v.price)) {
+    if (v.price === null || v.price <= 0 || isNaN(v.price)) {
       issues.push({
         rowType: "Variant",
         rowNumber: v.rowNumber,
         sku: v.variantSku,
         field: "Selling Price",
         severity: "ERROR",
-        message: `Invalid selling price (₹${v.price}). Must be greater than 0.`
+        message: `Invalid selling price (₹${v.price ?? 0}). Must be greater than 0.`
       })
     }
 
-    if (v.compareAtPrice && v.compareAtPrice < v.price) {
+    if (v.compareAtPrice !== null && v.compareAtPrice !== undefined && v.price !== null && v.compareAtPrice < v.price) {
       issues.push({
         rowType: "Variant",
         rowNumber: v.rowNumber,
@@ -842,13 +1217,16 @@ export async function validateCatalogue(
   const status: "READY" | "WARNING" | "ERROR" =
     errorCount > 0 ? "ERROR" : warningCount > 0 ? "WARNING" : "READY"
 
-  // Build Preview List
+  // Build Preview List (Only display active/included variants or fallback to all)
   const previewParents = parents.map(p => {
-    const parentVars = variants.filter(v => v.parentSku.toUpperCase() === p.sku.toUpperCase())
+    const includedVars = variants.filter(v => v.parentSku.toUpperCase() === p.sku.toUpperCase() && v.includeVariant)
+    const allVars = variants.filter(v => v.parentSku.toUpperCase() === p.sku.toUpperCase())
+    const parentVars = includedVars.length > 0 ? includedVars : allVars
+
     const pImages = (imagesBySku[p.sku.toUpperCase()] || []).map(img => ({
       fileName: img.fileName,
       role: img.role,
-      previewUrl: `data:${img.mimeType};base64,${img.buffer.toString("base64")}`
+      previewUrl: img.buffer && img.buffer.length > 0 ? `data:${img.mimeType};base64,${img.buffer.toString("base64")}` : undefined
     }))
     const pIssues = issues.filter(i => i.sku?.toUpperCase() === p.sku.toUpperCase())
     const pStatus: "READY" | "WARNING" | "ERROR" = pIssues.some(i => i.severity === "ERROR")
@@ -943,11 +1321,15 @@ export async function executeCatalogueImport(
   for (const parent of parents) {
     try {
       const parentSku = parent.sku.trim().toUpperCase()
-      const parentVars = variants.filter(v => v.parentSku.trim().toUpperCase() === parentSku)
+      // PHASE 4 & 5: Filter variants to only included ones (or all if none marked included)
+      let parentVars = variants.filter(v => v.parentSku.trim().toUpperCase() === parentSku && v.includeVariant)
+      if (parentVars.length === 0) {
+        parentVars = variants.filter(v => v.parentSku.trim().toUpperCase() === parentSku)
+      }
 
       // Find default variant or lowest price
       const defaultVar = parentVars.find(v => v.isDefault) || parentVars[0]
-      const price = defaultVar ? defaultVar.price : 1500
+      const price = defaultVar?.price ?? 1500
       const compareAtPrice = defaultVar?.compareAtPrice ?? null
       const costPrice = defaultVar?.costPrice ?? 500
       const totalStock = parentVars.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
@@ -1003,14 +1385,14 @@ export async function executeCatalogueImport(
         sku: v.variantSku,
         size: v.size,
         bottleType: v.bottleType,
-        price: v.price,
+        price: v.price ?? 1500,
         compareAtPrice: v.compareAtPrice ?? null,
         costPrice: v.costPrice ?? null,
         stock: v.stock,
         reorderLevel: v.reorderLevel ?? 5,
         isDefault: Boolean(v.isDefault),
         status: v.status || "Active",
-        imageUrl: savedImageUrls[0]?.url || primaryImageUrl
+        imageUrl: v.variantImageUrl || savedImageUrls[0]?.url || primaryImageUrl
       }))
 
       // Generate clean collision-proof slug
@@ -1020,7 +1402,7 @@ export async function executeCatalogueImport(
       // Check if product already exists by SKU to update instead of duplicate
       const { data: existingProduct } = await supabase
         .from("products")
-        .select("id, slug")
+        .select("id, slug, variants, images, image_url, description, short_description, top_notes, middle_notes, base_notes, tags")
         .eq("sku", parentSku)
         .maybeSingle()
 
@@ -1062,8 +1444,31 @@ export async function executeCatalogueImport(
       let targetProductId = ""
 
       if (existingProduct) {
-        // UPDATE existing product
+        // UPDATE existing product safely (preserve ID, slug, and merge variants)
         slug = existingProduct.slug
+
+        // Merge existing variants with incoming variants by SKU to never delete existing variants in DB
+        const existingVariants = Array.isArray(existingProduct.variants) ? existingProduct.variants : []
+        const variantMap = new Map<string, any>()
+        for (const ev of existingVariants) {
+          if (ev?.sku) variantMap.set(String(ev.sku).toUpperCase(), ev)
+        }
+        for (const mv of mappedVariants) {
+          variantMap.set(String(mv.sku).toUpperCase(), mv)
+        }
+        payload.variants = Array.from(variantMap.values())
+
+        // Do not overwrite existing records with blank spreadsheet cells
+        if (!parent.topNotes && existingProduct.top_notes) payload.top_notes = existingProduct.top_notes
+        if (!parent.heartNotes && existingProduct.middle_notes) payload.middle_notes = existingProduct.middle_notes
+        if (!parent.baseNotes && existingProduct.base_notes) payload.base_notes = existingProduct.base_notes
+        if (!parent.description && existingProduct.description) payload.description = existingProduct.description
+        if (!parent.shortDescription && existingProduct.short_description) payload.short_description = existingProduct.short_description
+        if (savedImageUrls.length === 0 && existingProduct.image_url) {
+          payload.image_url = existingProduct.image_url
+          payload.images = existingProduct.images || [existingProduct.image_url]
+        }
+
         const { data: updated, error: updateErr } = await supabase
           .from("products")
           .update(payload)

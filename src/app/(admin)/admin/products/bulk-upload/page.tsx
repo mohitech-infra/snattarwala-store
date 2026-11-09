@@ -1389,9 +1389,11 @@ export default function BulkUploadPage() {
                                       <td className="py-1.5 px-2 font-mono text-accent">{v.variantSku}</td>
                                       <td className="py-1.5 px-2 font-semibold text-foreground">{v.size}</td>
                                       <td className="py-1.5 px-2 text-foreground/70">{v.bottleType}</td>
-                                      <td className="py-1.5 px-2 font-bold text-foreground">₹{v.price}</td>
+                                      <td className="py-1.5 px-2 font-bold text-foreground">
+                                        {v.price !== null && v.price !== undefined ? `₹${v.price}` : "-"}
+                                      </td>
                                       <td className="py-1.5 px-2 text-foreground/50">
-                                        {v.compareAtPrice ? `₹${v.compareAtPrice}` : "-"}
+                                        {v.compareAtPrice !== null && v.compareAtPrice !== undefined ? `₹${v.compareAtPrice}` : "-"}
                                       </td>
                                       <td className="py-1.5 px-2 text-foreground/80">{v.stock} units</td>
                                       <td className="py-1.5 px-2">
