@@ -51,7 +51,8 @@ export interface PublicProduct {
 
 function mapDummyProducts(): PublicProduct[] {
   return DUMMY_PRODUCTS.map((p) => {
-    const defaultSizes = p.sizes || (p.category === "Perfumes" ? ["50ml", "100ml"] : ["6ml", "12ml"])
+    const rawDefaultSizes: string[] = p.sizes || (p.category === "Perfumes" ? ["50ml", "100ml"] : ["6ml", "12ml"])
+    const defaultSizes: string[] = Array.from(new Set<string>(rawDefaultSizes.map((s: string) => String(s || "").trim()).filter(Boolean)))
     const variants: ProductVariant[] = defaultSizes.map((size, idx) => ({
       size,
       price: idx === 0 ? p.price : Math.round(p.price * (idx === 1 ? 1.8 : 2.5)),
@@ -151,9 +152,11 @@ export async function getPublicProducts(): Promise<PublicProduct[]> {
         }))
       }
 
-      const sizes = variants.length > 0 
+      const rawSizes: string[] = variants.length > 0 
         ? variants.map(v => v.size) 
         : (p.size ? p.size.split(",").map((s: string) => s.trim()) : ["Standard"])
+
+      const sizes: string[] = Array.from(new Set<string>(rawSizes.map((s: string) => String(s || "").trim()).filter(Boolean)))
 
       return {
         id: p.id,

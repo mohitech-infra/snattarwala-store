@@ -1107,9 +1107,9 @@ function ChatbotInner({ isAdmin }: { isAdmin: boolean }) {
                                   <div className="flex items-center gap-1.5 pt-1">
                                     <span className="text-[10px] text-muted-foreground font-semibold">Size:</span>
                                     <div className="flex gap-1">
-                                      {product.sizes.map((s) => (
+                                      {Array.from(new Set(product.sizes.map((s) => String(s || "").trim()).filter(Boolean))).map((s, sIdx) => (
                                         <button
-                                          key={s}
+                                          key={`chat-size-${product.id}-${s}-${sIdx}`}
                                           onClick={() =>
                                             setSelectedSizes((prev) => ({ ...prev, [product.id]: s }))
                                           }

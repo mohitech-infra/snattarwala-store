@@ -161,11 +161,11 @@ export function ProductCard({ product }: ProductCardProps) {
               <span className="font-bold text-accent text-xs">{selectedSize}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {availableSizes.map((size) => {
+              {availableSizes.map((size, sIdx) => {
                 const isSelected = selectedSize === size
                 return (
                   <button
-                    key={size}
+                    key={`card-size-${product.id}-${size}-${sIdx}`}
                     type="button"
                     onClick={(e) => {
                       e.preventDefault()

@@ -45,8 +45,16 @@ export function ProductDetailView({
          (v.size && v.size.toLowerCase() === initialVariantSku?.toLowerCase())
   ) || variants.find(v => v.isDefault) || variants[0]
 
+  // Deduplicate sizes to guarantee unique size buttons and avoid duplicate React keys
+  const uniqueSizes = Array.from(
+    new Set([
+      ...(product.sizes || []),
+      ...variants.map(v => v.size).filter(Boolean)
+    ].map(s => String(s || "").trim()).filter(Boolean))
+  )
+
   const availableBottleTypes = getAvailableBottleTypes(product.category)
-  const [selectedSize, setSelectedSize] = useState<string>(matchedInitial?.size || product.sizes[0] || "")
+  const [selectedSize, setSelectedSize] = useState<string>(matchedInitial?.size || uniqueSizes[0] || product.sizes?.[0] || "")
   const [selectedBottleType, setSelectedBottleType] = useState<string>(
     matchedInitial?.bottleType || getDefaultBottleType(product.category, matchedInitial?.size)
   )
@@ -96,7 +104,8 @@ export function ProductDetailView({
 
   const handleSelectSize = (size: string) => {
     setSelectedSize(size)
-    const v = variants.find(item => item.size === size)
+    const v = variants.find(item => item.size === size && (!selectedBottleType || item.bottleType === selectedBottleType))
+      || variants.find(item => item.size === size)
     if (v?.bottleType) {
       setSelectedBottleType(v.bottleType)
     }
@@ -115,7 +124,7 @@ export function ProductDetailView({
         price: currentPrice,
         imageUrl: activeVariant?.imageUrl || selectedImage || product.imageUrl || "/placeholder.jpg",
         quantity,
-        size: selectedSize || product.sizes[0] || "Standard",
+        size: selectedSize || uniqueSizes[0] || product.sizes?.[0] || "Standard",
         bottleType: selectedBottleType
       })
       setIsCartOpen(false)
@@ -180,7 +189,7 @@ export function ProductDetailView({
               <div className="grid grid-cols-4 gap-4">
                 {gallery.map((img, i) => (
                   <button 
-                    key={i} 
+                    key={`img-${i}-${img}`} 
                     onClick={() => setSelectedImage(img)}
                     className={`aspect-square bg-secondary/30 rounded-md overflow-hidden cursor-pointer border transition-all relative ${selectedImage === img ? 'border-accent ring-2 ring-accent/30' : 'border-border/50 hover:border-accent'}`}
                   >
@@ -244,14 +253,14 @@ export function ProductDetailView({
             {product.fragranceNotes && product.fragranceNotes.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-8">
                 {product.fragranceNotes.map((note, index) => (
-                  <FragranceNoteBadge key={index} note={note} className="px-3 py-1" />
+                  <FragranceNoteBadge key={`note-${index}-${note}`} note={note} className="px-3 py-1" />
                 ))}
               </div>
             )}
 
             <div className="space-y-8 mb-10 flex-grow border-t border-b border-border/50 py-8">
               {/* Size Selection with Dynamic Price Badges */}
-              {product.sizes && product.sizes.length > 0 && (
+              {uniqueSizes.length > 0 && (
                 <div>
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-xs font-semibold uppercase tracking-widest text-foreground/80">Select Fragrance Size</span>
@@ -260,13 +269,15 @@ export function ProductDetailView({
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    {product.sizes.map((size) => {
-                      const v = variants.find((varItem) => varItem.size === size)
+                    {uniqueSizes.map((size, idx) => {
+                      const v = variants.find((varItem) => varItem.size === size && (!selectedBottleType || varItem.bottleType === selectedBottleType))
+                        || variants.find((varItem) => varItem.size === size)
                       const isSelected = selectedSize === size
 
                       return (
                         <button 
-                          key={size}
+                          key={`size-${size}-${idx}`}
+                          type="button"
                           onClick={() => handleSelectSize(size)}
                           className={`px-6 py-2.5 border rounded-sm transition-all flex flex-col items-center justify-center min-w-[100px] ${
                             isSelected 
@@ -295,11 +306,11 @@ export function ProductDetailView({
                     <span className="text-[11px] text-accent font-semibold">{selectedBottleType}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {availableBottleTypes.map((bt) => {
+                    {availableBottleTypes.map((bt, idx) => {
                       const isSelected = selectedBottleType === bt.name
                       return (
                         <button
-                          key={bt.id}
+                          key={`bt-${bt.id || bt.name}-${idx}`}
                           type="button"
                           onClick={() => setSelectedBottleType(bt.name)}
                           className={`p-3 border rounded-sm transition-all text-left flex flex-col justify-between ${
@@ -478,7 +489,12 @@ export function ProductDetailView({
                       <div className="space-y-4">
                         <h4 className="font-heading font-semibold text-lg text-foreground tracking-tight border-b border-border/30 pb-2">Top Notes</h4>
                         <ul className="space-y-3 text-foreground/70">
-                          {product.topNotes.map(note => <li key={note} className="flex items-center space-x-2"><span className="w-1.5 h-1.5 rounded-full bg-accent/50" /><span>{note}</span></li>)}
+                          {product.topNotes.map((note, idx) => (
+                            <li key={`top-${idx}-${note}`} className="flex items-center space-x-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
+                              <span>{note}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     )}
@@ -486,7 +502,12 @@ export function ProductDetailView({
                       <div className="space-y-4">
                         <h4 className="font-heading font-semibold text-lg text-foreground tracking-tight border-b border-border/30 pb-2">Heart Notes</h4>
                         <ul className="space-y-3 text-foreground/70">
-                          {product.middleNotes.map(note => <li key={note} className="flex items-center space-x-2"><span className="w-1.5 h-1.5 rounded-full bg-accent/50" /><span>{note}</span></li>)}
+                          {product.middleNotes.map((note, idx) => (
+                            <li key={`mid-${idx}-${note}`} className="flex items-center space-x-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
+                              <span>{note}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     )}
@@ -494,7 +515,12 @@ export function ProductDetailView({
                       <div className="space-y-4">
                         <h4 className="font-heading font-semibold text-lg text-foreground tracking-tight border-b border-border/30 pb-2">Base Notes</h4>
                         <ul className="space-y-3 text-foreground/70">
-                          {product.baseNotes.map(note => <li key={note} className="flex items-center space-x-2"><span className="w-1.5 h-1.5 rounded-full bg-accent/50" /><span>{note}</span></li>)}
+                          {product.baseNotes.map((note, idx) => (
+                            <li key={`base-${idx}-${note}`} className="flex items-center space-x-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
+                              <span>{note}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     )}
